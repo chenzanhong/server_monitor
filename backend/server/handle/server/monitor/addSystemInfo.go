@@ -96,7 +96,7 @@ func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 
 	// 将数据插入数据库
 	// 插入 host_info 表
-	err = model.InsertHostInfo(db, requestData.HostInfo, username)
+	err = model.InsertHostInfo(requestData.HostInfo, username)
 	if err != nil {
 		s := fmt.Sprintf("Failed to insert host info: %s", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": s})
@@ -106,7 +106,7 @@ func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 	// 插入 hostandtoken 表
 	err = model.InsertHostandToken(db, requestData.HostInfo.Hostname, tokenh)
 	if err != nil {
-		s := fmt.Sprintf("Failed to insert host and token info %s", err)
+		s := fmt.Sprintf("Failed to insert host and token info: %s", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": s})
 		return
 	}
@@ -119,5 +119,5 @@ func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"status": "System information inserted successfully"})
+	c.JSON(http.StatusCreated, gin.H{"message": "System information inserted successfully"})
 }
