@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"backend/server/logs"
 	"backend/server/model"
 	"backend/server/redis"
 	"context"
@@ -42,7 +43,7 @@ func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 	var requestData RequestData
 	if err := c.ShouldBindJSON(&requestData); err != nil {
 		s := fmt.Sprintf("Invalid JSON data: %s", err)
-		log.Printf("Invalid JSON data: %s", err)
+		log.Printf("%sInvalid JSON data: %s", logs.GetLogPrefix(), err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": s})
 		return
 	}
@@ -53,7 +54,7 @@ func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 	key := fmt.Sprintf("system_info:%s:%d", requestData.HostInfo.Hostname, timestamp)
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
-		log.Printf("Failed to marshal data to JSON: %s", err)
+		log.Printf("%s Failed to marshal data to JSON: %s", logs.GetLogPrefix(), err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal data to JSON"})
 		return
 	}
@@ -61,7 +62,7 @@ func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 	// 将 JSON 字符串存储到 Redis
 	err = redis.Rdb.Set(ctx, key, jsonData, 30*time.Minute).Err()
 	if err != nil {
-		log.Printf("Failed to insert data into Redis: %s", err)
+		log.Printf("%sFailed to insert data into Redis: %s", logs.GetLogPrefix(), err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to insert data into Redis"})
 		return
 	}

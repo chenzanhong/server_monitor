@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"backend/server/logs"
 	"backend/server/model"
 	"log"
 	"net/http"
@@ -38,11 +39,13 @@ func ListAgent(c *gin.Context) {
 
 	fromTime, err := time.Parse(time.RFC3339, from)
 	if err != nil {
+		log.Println(logs.GetLogPrefix() + "无效的 from 时间格式")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 from 时间格式"})
 		return
 	}
 	toTime, err := time.Parse(time.RFC3339, to)
 	if err != nil {
+		log.Println(logs.GetLogPrefix() + "无效的 to 时间格式")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 to 时间格式"})
 		return
 	}
@@ -56,6 +59,7 @@ func ListAgent(c *gin.Context) {
 
 	rows, err := model.DB.Query(query, username, fromTime, toTime)
 	if err != nil {
+		log.Println(logs.GetLogPrefix()+"Failed to query host_info; details:", err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query host_info", "details": err.Error()})
 		return
 	}
@@ -65,12 +69,14 @@ func ListAgent(c *gin.Context) {
 	for rows.Next() {
 		var host model.HostInfo
 		if err := rows.Scan(&host.ID, &host.Hostname, &host.OS, &host.Platform, &host.KernelArch, &host.CreatedAt); err != nil {
+			log.Println(logs.GetLogPrefix()+"Failed to scan host_info; details:", err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan host_info", "details": err.Error()})
 			return
 		}
 		hosts = append(hosts, host)
 	}
 	if err := rows.Err(); err != nil {
+		log.Println(logs.GetLogPrefix()+"Error occurred during iteration; details:", err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error occurred during iteration", "details": err.Error()})
 		return
 	}

@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"backend/server/logs"
 	"backend/server/model"
 	"backend/server/redis"
 	"context"
@@ -17,7 +18,7 @@ import (
 func GetAgentInfo(c *gin.Context) {
 	hostname := c.Param("hostname")
 	if len(hostname) == 0 {
-		log.Printf("名字出错！")
+		log.Printf("%serror: 名字出错！", logs.GetLogPrefix())
 		c.JSON(http.StatusBadRequest, gin.H{"error": "主机名不能为空"})
 		return
 	}
@@ -36,11 +37,13 @@ func GetAgentInfo(c *gin.Context) {
 	// 解析时间范围
 	fromTime, err := time.Parse(time.RFC3339, from)
 	if err != nil {
+		log.Printf("%serror: Invalid 'from' time format", logs.GetLogPrefix())
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'from' time format"})
 		return
 	}
 	toTime, err := time.Parse(time.RFC3339, to)
 	if err != nil {
+		log.Printf("%serror: Invalid 'to' time format", logs.GetLogPrefix())
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'to' time format"})
 		return
 	}
@@ -52,7 +55,7 @@ func GetAgentInfo(c *gin.Context) {
 	for {
 		keys, nextCursor, err := redis.Rdb.Scan(ctx, cursor, fmt.Sprintf("system_info:%s:*", hostname), 100).Result()
 		if err != nil {
-			log.Printf("Error scanning Redis keys: %v\n", err)
+			log.Printf("%sError scanning Redis keys: %v\n", logs.GetLogPrefix(), err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan Redis keys"})
 			return
 		}
@@ -62,7 +65,7 @@ func GetAgentInfo(c *gin.Context) {
 			timestampStr := key[len(fmt.Sprintf("system_info:%s:", hostname)):]
 			timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
 			if err != nil {
-				log.Printf("Error parsing timestamp from key %s: %v\n", key, err)
+				log.Printf("%sError parsing timestamp from key %s: %v\n", logs.GetLogPrefix(), key, err)
 				continue
 			}
 
@@ -72,7 +75,7 @@ func GetAgentInfo(c *gin.Context) {
 				var requestData RequestData
 				err := redis.Rdb.Get(ctx, key).Scan(&requestData)
 				if err != nil {
-					log.Printf("Error getting data from Redis for key %s: %v\n", key, err)
+					log.Printf("%sError getting data from Redis for key %s: %v\n", logs.GetLogPrefix(), key, err)
 					continue
 				}
 				redisData = append(redisData, requestData)
@@ -95,8 +98,8 @@ func GetAgentInfo(c *gin.Context) {
 	// 如果 Redis 中的数据不完整，则从数据库中查询缺失的部分
 	dbData, err := model.ReadDB(queryType, from, to, hostname)
 	if err != nil {
+		log.Printf("%serror:%f", logs.GetLogPrefix(), err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		log.Printf("error:%f", err)
 		return
 	}
 
@@ -135,6 +138,6 @@ func mergeData(redisData []RequestData, dbData map[string]interface{}) []Request
 			}
 		}
 	}
-
+	log.Printf("%s合并Redis 和数据库中的数据", logs.GetLogPrefix())
 	return mergedData
 }
