@@ -42,13 +42,16 @@ func ReplaceAdmin(c *gin.Context) {
 	var oldAdmin u.User
 	if err := m_init.DB.Where("name =?", Username).First(&oldAdmin).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Println("管理员不存在")
 			c.JSON(http.StatusUnauthorized, gin.H{"message": "管理员不存在"})
 			return
 		}
+		log.Println("数据库查询管理员失败")
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询管理员失败"})
 		return
 	}
 	if oldAdmin.RoleId != 1 {
+		log.Println("没有更换管理员权限")
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "没有更换管理员权限"})
 		return
 	}
@@ -57,21 +60,26 @@ func ReplaceAdmin(c *gin.Context) {
 	var user u.User
 	if err := m_init.DB.Where("name =?", input.Username).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Println("新管理员不存在")
 			c.JSON(http.StatusUnauthorized, gin.H{"message": "新管理员不存在"})
 			return
 		}
+		log.Println("数据库查询管理员失败")
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询管理员失败"})
 		return
 	}
 	if user.Realname == "" {
+		log.Println("新管理员未实名,请在个人信息中实名")
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "新管理员未实名,请在个人信息中实名"})
 		return
 	}
 	if user.Email != input.Email {
+		log.Println("新管理员邮箱不匹配")
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "新管理员邮箱不匹配"})
 		return
 	}
 	if user.CompanyId != oldAdmin.CompanyId {
+		log.Println("新管理员和你不在一个公司")
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "新管理员和你不在一个公司"})
 		return
 	}
@@ -91,6 +99,7 @@ func ReplaceAdmin(c *gin.Context) {
 		CreateAt: 	createAt,
 	}
 	if err := m_init.DB.Create(&notice).Error; err != nil {
+		log.Println("数据库插入申请失败")
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库插入申请失败"})
 		return
 	}

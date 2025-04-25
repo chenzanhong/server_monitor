@@ -41,14 +41,17 @@ func JoinCompany(c *gin.Context) {
 	// 查询公司管理员所在公司
 	var admin u.User
 	if err := m_init.DB.Where("name =?", Username).First(&admin).Error; err != nil {
+		log.Println("数据库查询管理员失败")
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询管理员失败"})
 		return
 	}
 	if admin.CompanyId == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "你没有就职于某个公司"})
+		log.Println("你没有就职于某个公司,需要公司管理员账户")
+		c.JSON(http.StatusBadRequest, gin.H{"message": "你没有就职于某个公司,需要公司管理员账户"})
 		return
 	}
 	if admin.RoleId != 1 {
+		log.Println("你没有邀请加入公司的权限")
 		c.JSON(http.StatusBadRequest, gin.H{"message": "你没有邀请加入公司的权限"})
 		return
 	}
@@ -57,29 +60,35 @@ func JoinCompany(c *gin.Context) {
 	var user u.User
 	if err := m_init.DB.Where("name =?", input.Username).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Println("邀请用户不存在")
 			c.JSON(http.StatusBadRequest, gin.H{"message": "用户不存在"})
 			return
 		}
+		log.Println("数据库查询用户失败")
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询用户失败"})
 		return
 	}
 	if user.Realname == ""{
+		log.Println("邀请成员未实名,请在个人信息中实名")
 		c.JSON(http.StatusBadRequest, gin.H{"message": "邀请成员未实名,请在个人信息中实名" })
 		return
 	}
 	if user.Realname != input.Realname{
+		log.Println("邀请成员真实姓名不匹配")
 		c.JSON(http.StatusBadRequest, gin.H{"message": "邀请成员真实姓名不匹配"})
 		return
 	}
 
 	//查找要邀请人是否还在其他公司就职
 	if user.CompanyId != 0 {
+		log.Println("该用户已在其他公司就职")
 		c.JSON(http.StatusBadRequest, gin.H{"message": "该用户已在其他公司就职"})
 		return
 	}
 
 	//查看成员邮箱是否匹配
 	if user.Email != input.Email {
+		log.Println("成员邮箱不匹配")
 		c.JSON(http.StatusBadRequest, gin.H{"message": "成员邮箱不匹配"})
 		return
 	}
@@ -88,9 +97,11 @@ func JoinCompany(c *gin.Context) {
 	var company u.Company
 	if err := m_init.DB.Where("id =?", admin.CompanyId).First(&company).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Println("公司不存在")
 			c.JSON(http.StatusBadRequest, gin.H{"message": "公司不存在"})
 			return
 		}
+		log.Println("数据库查询公司失败")
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询公司失败"})
 		return
 	}
@@ -109,6 +120,7 @@ func JoinCompany(c *gin.Context) {
 		CreateAt:	createAt,
 	}
 	if err := m_init.DB.Create(&invitation).Error; err != nil {
+		log.Println("数据库插入邀请失败")
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库插入邀请失败"})
 		return
 	}
