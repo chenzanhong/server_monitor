@@ -20,7 +20,7 @@ oss: #aliyun oss 配置
   
 email:
   email_name: xxxx@163.com
-  email_password: # 应用密码
+  email_password: # 应用密码，163官网-设置-POP3/STMP/IMAP-开启pop3/smtp服务-记录应用密码
   base_url: # ngrok http后提供的url
   # 方式一是发送验证码，可以不用暴露内网，不使用这个base_url
   # 方式二是发送链接，需要暴露内网，使用这个base_url
@@ -30,4 +30,4 @@ email:
 
 smtp_server:
   SMTPServer_host: smtp.163.com
-  SMTPServer_port: 25
+  SMTPServer_port: 465  # 25 在服务器上会被限制

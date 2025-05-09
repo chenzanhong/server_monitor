@@ -1,6 +1,7 @@
 package update
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log"
@@ -144,7 +145,11 @@ func RequestResetPassword(c *gin.Context) {
 	}
 
 	// 发送重置密码邮件
-	sendResetPasswordEmail(request.Email, token)
+	err = sendResetPasswordEmail(request.Email, token)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "发送重置密码邮件失败"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "重置密码请求成功",
@@ -196,20 +201,22 @@ func ResetPassword(c *gin.Context) {
 }
 
 // 方式一 发送token
-func sendResetPasswordEmail(email, token string) {
+func sendResetPasswordEmail(email, token string) error {
 	myEmail := os.Getenv("EMAIL_NAME")
 	myPassword := os.Getenv("EMAIL_PASSWORD")
 	baseUrl := os.Getenv("BASE_URL")
 	smtpServerHost := os.Getenv("SMTP_SERVER_HOST")
 	smtpServerPortStr := os.Getenv("SMTP_SERVER_PORT")
 
-	if myEmail == "" || myPassword == "" || baseUrl == "" || smtpServerHost == "" || smtpServerPortStr == "" {
+	if myEmail == "" || myPassword == "" || smtpServerHost == "" || smtpServerPortStr == "" {
 		log.Fatalf("环境变量未正确设置")
+		return errors.New("环境变量未正确设置")
 	}
 
 	smtpServerPort, err := strconv.Atoi(smtpServerPortStr)
 	if err != nil {
 		log.Fatalf("将端口号转换为整数时出错: %v", err)
+		return err
 	}
 
 	log.Printf("Email: %s, Password: %s, SMTP Server: %s, Port: %d, BaseUrl: %s", myEmail, myPassword, smtpServerHost, smtpServerPort, baseUrl)
@@ -224,16 +231,20 @@ func sendResetPasswordEmail(email, token string) {
 	`, token))
 
 	d := gomail.NewDialer(smtpServerHost, smtpServerPort, myEmail, myPassword)
+	d.TLSConfig = &tls.Config{InsecureSkipVerify: true} // 跳过证书验证，生产环境中应谨慎使用
 	if err := d.DialAndSend(m); err != nil {
 		log.Printf("发送邮件失败: %v", err)
 		if strings.Contains(err.Error(), "535") { // 例如，检查错误消息中是否包含 SMTP 身份验证失败的代码
 			log.Printf("可能是 SMTP 身份验证错误")
+			return errors.New("发送邮件失败可能是 SMTP 身份验证错误")
 		} else if strings.Contains(err.Error(), "connection refused") {
 			log.Printf("SMTP 服务器连接被拒绝")
+			return errors.New("发送邮件失败：SMTP 服务器连接被拒绝")
 		}
 	} else {
 		log.Println("邮件发送成功")
 	}
+	return nil
 }
 
 // 发送链接
