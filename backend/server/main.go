@@ -6,6 +6,9 @@ import (
 	"backend/server/handle/agent/install"
 	"backend/server/handle/company"
 	"backend/server/handle/server/monitor" // 引入 monitor 包
+	"backend/server/handle/server/transfer"
+	g "backend/server/handle/server/transfer/global"
+	trans "backend/server/handle/server/transfer/trans-init"
 	"backend/server/handle/user/info"
 	"backend/server/handle/user/login"
 	"backend/server/handle/user/update"
@@ -13,6 +16,7 @@ import (
 	"backend/server/middlewire/cors"
 	db "backend/server/model/init"
 	"backend/server/redis"
+	"time"
 
 	"log"
 	"os"
@@ -107,6 +111,14 @@ func main() {
 	// if err := db.InitRedis(); err!= nil {
 	// 	log.Fatalf("Failed to connect to redis: %v", err)
 	// }
+	// 初始化SSH连接池及文件传输服务
+	g.Pool = trans.NewSSHConnectionPool(10, 5*time.Minute)
+	stopChan := make(chan struct{})
+	defer close(stopChan)
+	go g.Pool.Cleanup(stopChan)          // 启动清理协程
+	trans.NewFileTransferService(g.Pool) // 初始化文件传输服务
+	g.FTS = trans.NewFileTransferService(g.Pool)
+
 	go monitor.CheckServerStatus()
 	router.Static("/static", "./static")
 
@@ -126,7 +138,7 @@ func main() {
 		auth.POST("/request_reset_password", update.RequestResetPassword)
 		auth.GET("/info/recivelist", info.GetReceiveList) //获取该用户作为接收者所接收到的所有信息
 		auth.GET("/info/sendlist", info.GetSendList)      //获取该用户作为发送者所发送的所有信息
-		auth.POST("/info/manage", info.ManageNotice)       //处理通知状态
+		auth.POST("/info/manage", info.ManageNotice)      //处理通知状态
 
 		// 系统/公司管理员操作
 		auth.POST("/registercompany", company.Register)       //注册公司
@@ -144,6 +156,11 @@ func main() {
 		auth.GET("/list", monitor.ListAgent)
 		auth.GET("/monitor/:hostname", monitor.GetAgentInfo)
 		auth.GET("/monitor/status/:hostname", monitor.GetLatestSystemInfo)
+
+		// 文件传输
+		auth.POST("/upload", transfer.CommonUpload)
+		auth.POST("/download", transfer.CommonDownload)
+		auth.POST("/transfer", transfer.TransferBetweenTwoServers)
 	}
 	router.POST("/agent/addSystem_info", monitor.ReceiveAndStoreSystemMetrics)
 	router.Run("0.0.0.0:8080")

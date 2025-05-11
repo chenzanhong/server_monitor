@@ -77,7 +77,7 @@ func getDBConfigPath() string {
 	// 将路径转换为绝对路径并简化路径
 	absPath, err := filepath.Abs(dbConfigPath)
 	if err != nil {
-		log.Fatalf("无法获取绝对路径: %v", err)
+		log.Printf("无法获取绝对路径: %v", err)
 	}
 
 	simplifiedPath := filepath.Clean(absPath)

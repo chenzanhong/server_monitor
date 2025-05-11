@@ -43,7 +43,7 @@ func checkAndUpdateStatus(ctx context.Context, db *sql.DB) {
 		// 使用 SCAN 命令遍历所有主机键
 		keys, cursor, err = redis.Rdb.Scan(ctx, cursor, "host:*", 100).Result()
 		if err != nil {
-			log.Printf("%sError scanning Redis keys: %v\n", logs.GetLogPrefix(), err)
+			log.Printf("%sError scanning Redis keys: %v\n", logs.GetLogPrefix(2), err)
 			return
 		}
 
@@ -52,14 +52,14 @@ func checkAndUpdateStatus(ctx context.Context, db *sql.DB) {
 			// 获取主机的最后更新时间
 			lastUpdatedStr, err := redis.Rdb.HGet(ctx, key, "last_updated").Result()
 			if err != nil {
-				log.Printf("%sError getting last_updated for key %s: %v\n", logs.GetLogPrefix(), key, err)
+				log.Printf("%sError getting last_updated for key %s: %v\n", logs.GetLogPrefix(2), key, err)
 				continue
 			}
 
 			// 解析时间
 			lastUpdated, err := time.Parse(time.RFC3339, lastUpdatedStr)
 			if err != nil {
-				log.Printf("%sError parsing last_updated for key %s: %v\n", logs.GetLogPrefix(), key, err)
+				log.Printf("%sError parsing last_updated for key %s: %v\n", logs.GetLogPrefix(2), key, err)
 				continue
 			}
 
@@ -73,9 +73,9 @@ func checkAndUpdateStatus(ctx context.Context, db *sql.DB) {
                 WHERE host_name = $2`
 				_, err := db.Exec(query, lastUpdated, hostname)
 				if err != nil {
-					log.Printf("%sFailed to update status for host %s: %v\n", logs.GetLogPrefix(), hostname, err)
+					log.Printf("%sFailed to update status for host %s: %v\n", logs.GetLogPrefix(2), hostname, err)
 				} else {
-					log.Printf("%sUpdated status for host %s to offline\n", logs.GetLogPrefix(), hostname)
+					log.Printf("%sUpdated status for host %s to offline\n", logs.GetLogPrefix(2), hostname)
 				}
 			}
 		}

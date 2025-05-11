@@ -43,3 +43,20 @@ type Notice struct {
 	State       	string `json:"state" gorm:"column:state"`
 	CreateAt    	string `json:"create_at" gorm:"column:created_at"`
 }
+
+// host_info表
+type HostInfo struct {
+	ID         int    `json:"id" gorm:"primarykey;autoIncrement"`
+	UserName   string `json:"user_name" gorm:"column:user_name"` // 用户名
+	HostName   string `json:"host_name" gorm:"column:host_name"` // 主机名
+	CompanyID  int    `json:"company_id" gorm:"column:company_id"` // 公司ID
+	OS         string `json:"os" gorm:"column:os"` // 操作系统
+	Platform   string `json:"platform" gorm:"column:platform"` // 平台
+	KernelArch string `json:"kernel_arch" gorm:"column:kernel_arch"` // 内核架构
+	CreatedAt  string `json:"created_at" gorm:"column:created_at"` // 创建时间
+}
+
+// TableName 指定表名
+func (HostInfo) TableName() string {
+	return "host_info" // 数据库表名对应
+}
