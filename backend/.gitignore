@@ -84,7 +84,7 @@ Dockerfile
 Dockerfile.*
 
 # 忽略日志文件
-logs/
+logs/logs/
 
 # 忽略配置文件
 config.jsonya
