@@ -38,7 +38,7 @@ func UpdateUserInfo(c *gin.Context) {
 
 	// 解析请求体	前端可只传递要修改的字段
 	var request struct {
-		NewName     string `json:"new_name"`
+		// NewName     string `json:"new_name"`
 		NewPassword string `json:"new_password"`
 		Email       string `json:"new_email"`
 		RealName    string `json:"realname"`
@@ -49,25 +49,32 @@ func UpdateUserInfo(c *gin.Context) {
 	}
 
 	// 检查新用户名是否已存在
-	if request.NewName != "" {
-		var existingUser u.User
-		if err := m_init.DB.Where("name = ?", request.NewName).First(&existingUser).Error; err == nil {
-			c.JSON(http.StatusConflict, gin.H{"message": "更新用户名错误：新用户名已存在", "error": err.Error()})
-			return
-		} else if err == gorm.ErrRecordNotFound {
-			// 用户名不存在，执行更新操作
-			if err := m_init.DB.Model(&u.User{}).Where("name =?", username).Updates(map[string]interface{}{"name": request.NewName}).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"message": "更新用户名失败", "error": err.Error()})
-				return
-			}
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询失败"})
-			return
-		}
+	// if request.NewName != "" {
+	// 	var existingUser u.User
+	// 	if err := m_init.DB.Where("name = ?", request.NewName).First(&existingUser).Error; err == nil {
+	// 		c.JSON(http.StatusConflict, gin.H{"message": "更新用户名错误：新用户名已存在", "error": err.Error()})
+	// 		return
+	// 	} else if err == gorm.ErrRecordNotFound {
+	// 		// 用户名不存在，执行更新操作
+	// 		if err := m_init.DB.Model(&u.User{}).Where("name =?", username).Updates(map[string]interface{}{"name": request.NewName}).Error; err != nil {
+	// 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新用户名失败", "error": err.Error()})
+	// 			return
+	// 		}
+	// 	} else {
+	// 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询失败"})
+	// 		return
+	// 	}
+	// }
+
+	// 获取当前用户信息
+	var user u.User
+	if err := m_init.DB.Where("name =?", username).First(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "获取用户信息失败", "error": err.Error()})
+		return
 	}
 
 	// 检查新密码是否为空
-	if request.NewPassword != "" {
+	if request.NewPassword != "" && request.NewPassword != user.Password {
 		// 执行密码更新操作
 		if err := m_init.DB.Model(&u.User{}).Where("name =?", username).Updates(map[string]interface{}{"password": request.NewPassword}).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新密码失败", "error": err.Error()})
@@ -76,15 +83,16 @@ func UpdateUserInfo(c *gin.Context) {
 	}
 
 	// 检查新邮箱是否为空
-	if request.Email != "" {
+	if request.Email != "" && request.Email != user.Email {
 		// 执行邮箱更新操作
 		if err := m_init.DB.Model(&u.User{}).Where("name =?", username).Updates(map[string]interface{}{"email": request.Email}).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新邮箱失败", "error": err.Error()})
+			return
 		}
 	}
 
 	// 检查是否传入真实姓名
-	if request.RealName != "" {
+	if request.RealName != "" && request.RealName != user.Realname {
 		// 执行真实姓名更新操作
 		if err := m_init.DB.Model(&u.User{}).Where("name =?", username).Updates(map[string]interface{}{"realname": request.RealName}).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新真实姓名失败", "error": err.Error()})

@@ -37,9 +37,9 @@ type CommonTransRequest struct {
 	Auth   string `json:"auth" form:"auth"`     // SSH密码或密钥
 }
 
-// 查询服务器是否是用户所在公司的服务器
-func CheckServerBelongsToCompany(username, server string) (bool, error) {
-	// // 查询用户
+// 查询服务器是否是用户(所在公司)
+func CheckServerBelongs(username, server string) (bool, error) {
+	// 查询用户
 	// var user u.User
 	// if err := m_init.DB.Where("name = ?", username).First(&user).Error; err != nil {
 	// 	log.Fatalf("查询用户失败: %v", err)
@@ -66,32 +66,32 @@ func CheckServerBelongsToCompany(username, server string) (bool, error) {
 func TransferBetweenTwoServers(c *gin.Context) {
 	Username, exists := c.Get("username") // 从上下文中获取用户名
 	if !exists {
-		c.JSON(401, gin.H{"error": "未登录"})
+		c.JSON(401, gin.H{"message": "未登录"})
 		return
 	}
 
 	var request RequestP2P
 	if err := c.BindJSON(&request); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		c.JSON(400, gin.H{"message": fmt.Sprintf("解析请求失败: %v", err)})
 		return
 	}
 
-	flag, err := CheckServerBelongsToCompany(Username.(string), request.SourceServer)
+	flag, err := CheckServerBelongs(Username.(string), request.SourceServer)
 	if err != nil {
-		c.JSON(500, gin.H{"message": fmt.Sprint("查询用户与源服务器是否属于同一公司失败: %v", err.Error())})
+		c.JSON(500, gin.H{"message": fmt.Sprint("查询源服务器是否属于用户（所在公司）失败: %v", err.Error())})
 		return
 	}
 	if !flag {
-		c.JSON(400, gin.H{"error": "该源服务器不是用户所在公司的服务器"})
+		c.JSON(400, gin.H{"message": "该源服务器不属于用户（所在公司）"})
 		return
 	}
-	flag, err = CheckServerBelongsToCompany(Username.(string), request.TargetServer)
+	flag, err = CheckServerBelongs(Username.(string), request.TargetServer)
 	if err != nil {
-		c.JSON(500, gin.H{"message": fmt.Sprint("查询用户与目的服务器是否属于同一公司失败: %v", err)})
+		c.JSON(500, gin.H{"message": fmt.Sprint("查询目标服务器是否属于用户（所在公司）失败: %v", err.Error())})
 		return
 	}
 	if !flag {
-		c.JSON(400, gin.H{"error": "该目标服务器不是用户所在公司的服务器"})
+		c.JSON(400, gin.H{"message": "该目标服务器不属于用户（所在公司）"})
 		return
 	}
 
@@ -149,13 +149,13 @@ func CommonUpload(c *gin.Context) {
 	}
 
 	// 检查服务器是否属于用户所在的公司或是否是用户自己的服务器
-	flag, err := CheckServerBelongsToCompany(Username.(string), request.Server)
+	flag, err := CheckServerBelongs(Username.(string), request.Server)
 	if err != nil {
-		c.JSON(500, gin.H{"message": fmt.Sprint("查询服务器与用户（所在公司）的关系失败: %v", err)})
+		c.JSON(500, gin.H{"message": fmt.Sprint("查询服务器是否属于用户（所在公司）失败: %v", err)})
 		return
 	}
 	if !flag {
-		c.JSON(400, gin.H{"error": "该服务器不属于用户（所在公司）"})
+		c.JSON(400, gin.H{"message": "该服务器不属于用户（所在公司）"})
 		return
 	}
 
@@ -196,7 +196,7 @@ func CommonUpload(c *gin.Context) {
 func CommonDownload(c *gin.Context) {
 	Username, exists := c.Get("username") // 从上下文中获取用户名
 	if !exists {
-		c.JSON(401, gin.H{"error": "未登录"})
+		c.JSON(401, gin.H{"message": "未登录"})
 		return
 	}
 	var request CommonTransRequest
@@ -205,9 +205,9 @@ func CommonDownload(c *gin.Context) {
 		return
 	}
 
-	flag, err := CheckServerBelongsToCompany(Username.(string), request.Server)
+	flag, err := CheckServerBelongs(Username.(string), request.Server)
 	if err != nil {
-		c.JSON(500, gin.H{"message": fmt.Sprint("查询服务器与用户（所在公司）的关系失败: %v", err)})
+		c.JSON(500, gin.H{"message": fmt.Sprint("查询服务器是否属于用户（所在公司）失败: %v", err)})
 		return
 	}
 	if !flag {
