@@ -42,5 +42,5 @@ func main() {
 		log.Printf("文件传输失败: %v", err)
 	}
 
-	fmt.Printf("文件传输任务已启动，任务ID: %s\n", taskID)
+	fmt.Printf("文件传输任务已完成，任务ID: %s\n", taskID)
 }

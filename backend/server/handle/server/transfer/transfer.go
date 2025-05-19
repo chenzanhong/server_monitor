@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
+	"net/url"
 	"path"
 	"strconv"
 	"strings"
@@ -72,26 +74,26 @@ func TransferBetweenTwoServers(c *gin.Context) {
 
 	var request RequestP2P
 	if err := c.BindJSON(&request); err != nil {
-		c.JSON(400, gin.H{"message": fmt.Sprintf("解析请求失败: %v", err)})
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("解析请求失败: %v", err)})
 		return
 	}
 
 	flag, err := CheckServerBelongs(Username.(string), request.SourceServer)
 	if err != nil {
-		c.JSON(500, gin.H{"message": fmt.Sprint("查询源服务器是否属于用户（所在公司）失败: %v", err.Error())})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprint("查询源服务器是否属于用户（所在公司）失败: %v", err.Error())})
 		return
 	}
 	if !flag {
-		c.JSON(400, gin.H{"message": "该源服务器不属于用户（所在公司）"})
+		c.JSON(http.StatusForbidden, gin.H{"message": "该源服务器不属于用户（所在公司）"})
 		return
 	}
 	flag, err = CheckServerBelongs(Username.(string), request.TargetServer)
 	if err != nil {
-		c.JSON(500, gin.H{"message": fmt.Sprint("查询目标服务器是否属于用户（所在公司）失败: %v", err.Error())})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprint("查询目标服务器是否属于用户（所在公司）失败: %v", err.Error())})
 		return
 	}
 	if !flag {
-		c.JSON(400, gin.H{"message": "该目标服务器不属于用户（所在公司）"})
+		c.JSON(http.StatusForbidden, gin.H{"message": "该目标服务器不属于用户（所在公司）"})
 		return
 	}
 
@@ -105,7 +107,7 @@ func TransferBetweenTwoServers(c *gin.Context) {
 		err = trans.CreateConnectionToPool(g.Pool, request.SourceServer, request.SourceUser, request.SourceAuth)
 		if err != nil {
 			log.Printf("创建与源服务器的连接失败: %v", err)
-			c.JSON(400, gin.H{"message": fmt.Sprint("创建与源服务器的连接失败: %v", err)})
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint("创建与源服务器的连接失败: %v", err)})
 			return
 		}
 	}
@@ -115,7 +117,7 @@ func TransferBetweenTwoServers(c *gin.Context) {
 		err = trans.CreateConnectionToPool(g.Pool, request.TargetServer, request.TargetUser, request.TargetAuth)
 		if err != nil {
 			log.Printf("创建与目标服务器的连接失败: %v", err)
-			c.JSON(400, gin.H{"message": fmt.Sprint("创建与目标服务器的连接失败: %v", err)})
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint("创建与目标服务器的连接失败: %v", err)})
 			return
 		}
 	}
@@ -128,10 +130,13 @@ func TransferBetweenTwoServers(c *gin.Context) {
 		request.TargetPath,   // 目标文件路径
 	)
 	if err != nil {
-		log.Println("文件传输失败: %v", err)
+		log.Printf("文件传输失败: %v；文件传输任务ID：%s", err, taskID)
+		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("文件传输失败: %v", err), "task_id": taskID})
+		return
 	}
 
-	fmt.Printf("文件传输任务已启动，任务ID: %s\n", taskID)
+	fmt.Printf("文件传输任务已完成，任务ID: %s\n", taskID)
+	c.JSON(200, gin.H{"message": "文件传输完成", "task_id": taskID})
 }
 
 // 客户端与一个指定的服务器进行文件传输，上传
@@ -144,25 +149,25 @@ func CommonUpload(c *gin.Context) {
 
 	var request CommonTransRequest
 	if err := c.ShouldBind(&request); err != nil {
-		c.JSON(400, gin.H{"message": fmt.Sprintf("解析请求失败: %v", err)})
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("解析请求失败: %v", err)})
 		return
 	}
 
 	// 检查服务器是否属于用户所在的公司或是否是用户自己的服务器
 	flag, err := CheckServerBelongs(Username.(string), request.Server)
 	if err != nil {
-		c.JSON(500, gin.H{"message": fmt.Sprint("查询服务器是否属于用户（所在公司）失败: %v", err)})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprint("查询服务器是否属于用户（所在公司）失败: %v", err)})
 		return
 	}
 	if !flag {
-		c.JSON(400, gin.H{"message": "该服务器不属于用户（所在公司）"})
+		c.JSON(http.StatusForbidden, gin.H{"message": "该服务器不属于用户（所在公司）"})
 		return
 	}
 
 	// 获取上传的文件
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(400, gin.H{"message": fmt.Sprintf("获取要上传的文件失败: %v", err)})
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("获取要上传的文件失败: %v", err)})
 		return
 	}
 
@@ -172,24 +177,24 @@ func CommonUpload(c *gin.Context) {
 		err = trans.CreateConnectionToPool(g.Pool, request.Server, request.User, request.Auth)
 		if err != nil {
 			log.Printf("创建与目标服务器的连接失败: %v", err)
-			c.JSON(400, gin.H{"message": fmt.Sprint("创建与目标服务器的连接失败: %v", err)})
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint("创建与目标服务器的连接失败: %v", err)})
 			return
 		}
 	}
 
 	// 执行文件传输任务
-	_, err = g.FTS.CreateCommonUploadTask(
+	taskID, err := g.FTS.CreateCommonUploadTask(
 		file,
 		request.Server, // 目标服务器IP
 		request.Path,   // 目标文件路径
 	)
 	if err != nil {
 		log.Printf("文件上传失败: %v", err)
-		c.JSON(400, gin.H{"message": fmt.Sprintf("文件上传失败: %v", err)})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("文件上传失败: %v", err), "task_id": taskID})
 		return
 	}
 
-	c.JSON(200, gin.H{"message": "文件上传完成"})
+	fmt.Printf("文件上传任务已完成，任务ID: %s\n", taskID)
 }
 
 // 客户端与一个指定的服务器进行文件传输，下载
@@ -201,17 +206,17 @@ func CommonDownload(c *gin.Context) {
 	}
 	var request CommonTransRequest
 	if err := c.BindJSON(&request); err != nil {
-		c.JSON(400, gin.H{"message": fmt.Sprintf("解析请求失败: %v", err)})
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("解析请求失败: %v", err)})
 		return
 	}
 
 	flag, err := CheckServerBelongs(Username.(string), request.Server)
 	if err != nil {
-		c.JSON(500, gin.H{"message": fmt.Sprint("查询服务器是否属于用户（所在公司）失败: %v", err)})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprint("查询服务器是否属于用户（所在公司）失败: %v", err)})
 		return
 	}
 	if !flag {
-		c.JSON(400, gin.H{"message": "该服务器不属于用户（所在公司）"})
+		c.JSON(http.StatusForbidden, gin.H{"message": "该服务器不属于用户（所在公司）"})
 		return
 	}
 	// 检查是否已存在到指定服务器的SSH连接
@@ -220,7 +225,7 @@ func CommonDownload(c *gin.Context) {
 		err = trans.CreateConnectionToPool(g.Pool, request.Server, request.User, request.Auth)
 		if err != nil {
 			log.Printf("创建与目标服务器的连接失败: %v", err)
-			c.JSON(400, gin.H{"message": fmt.Sprint("创建与目标服务器的连接失败: %v", err)})
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint("创建与目标服务器的连接失败: %v", err)})
 			return
 		}
 	}
@@ -232,7 +237,7 @@ func CommonDownload(c *gin.Context) {
 	if err != nil {
 		// 获取连接失败
 		log.Printf("获取连接失败: %v", err)
-		c.JSON(400, gin.H{"message": fmt.Sprintf("获取连接失败: %v", err)})
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("获取连接失败: %v", err)})
 		return
 	}
 	defer sftpClient.Close()
@@ -240,35 +245,41 @@ func CommonDownload(c *gin.Context) {
 	file, err := sftpClient.Open(request.Path) // 打开远程文件
 	if err != nil {
 		log.Printf("远程文件打开失败: %v", err)
-		c.JSON(400, gin.H{"message": fmt.Sprintf("远程文件打开失败: %v", err)})
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("远程文件打开失败: %v", err)})
 		return
 	}
 	defer file.Close()
+
 	// 判断文件是否存在或是目录
 	stat, err := file.Stat() // 获取文件信息，包括大小等
 	if err != nil {
 		log.Printf("文件不存在: %v", err)
-		c.JSON(400, gin.H{"message": fmt.Sprintf("文件不存在: %v", err)})
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("文件不存在: %v", err)})
 		return
 	}
 	if stat.IsDir() {
 		log.Printf("路径是一个目录: %v", err)
-		c.JSON(400, gin.H{"message": fmt.Sprintf("路径是一个目录: %v", err)})
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("路径是一个目录: %v", err)})
 		return
 	}
 
 	filename := path.Base(request.Path)
+	encodedFilename := url.PathEscape(filename)
+	fmt.Println(filename + "\n" + encodedFilename)
 	c.Header("Content-Type", "application/octet-stream")
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
-	fi, err := file.Stat()
+	c.Header("Content-Disposition", "attachment; "+fmt.Sprintf(`filename="%s"; filename*=UTF-8''%s`,
+		encodedFilename, encodedFilename))
+
+	fi, err := file.Stat() // 获取文件信息，包括大小等
 	if err != nil {
 		log.Printf("获取文件信息失败: %v", err)
-		c.JSON(500, gin.H{"message": "获取文件信息失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "获取文件信息失败"})
 		return
 	}
-	c.Header("Content-Length", strconv.FormatInt(fi.Size(), 10))
+	c.Header("Content-Length", strconv.FormatInt(fi.Size(), 10)) // 设置文件大小
 
-	c.Writer.WriteHeader(200)
+	// WriterHeader 不是必须的，Gin会自动处理
+	// c.Writer.WriteHeader(200)
 
 	if _, err := io.Copy(c.Writer, file); err != nil {
 		if strings.Contains(err.Error(), "broken pipe") || err.Error() == "connection lost" {

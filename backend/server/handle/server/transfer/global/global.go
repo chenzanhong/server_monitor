@@ -154,7 +154,6 @@ func (fts *FileTransferServiceImpl) CreateCommonUploadTask(file *multipart.FileH
 		fts.Pool.Put(server, client) // 放回连接
 		return "", err
 	}
-	defer sftpClient.Close() // 确保在函数结束时关闭SFTP客户端
 
 	// 实际传输逻辑
 	srcFile, err := file.Open()
@@ -205,8 +204,7 @@ func (fts *FileTransferServiceImpl) CreateCommonDownloadTask(server, path string
 		return nil, "", err
 	}
 
-	// 不Put，因为需要保持连接
-	// fts.Pool.Put(server, client)
+	fts.Pool.Put(server, client)
 
 	// 生成任务ID
 	taskID := uuid.New().String()
@@ -240,14 +238,15 @@ func (fts *FileTransferServiceImpl) CreateTransferBetween2STask(srcServer, srcPa
 	}
 	defer func() {
 		if err != nil {
-			srcSftp.Close()
+			// srcSftp.Close()
 			fts.Pool.Put(srcServer, srcClient)
+			fts.Pool.Put(destServer, destClient)
 		}
 	}()
 
 	destSftp, err := sftp.NewClient(destClient)
 	if err != nil {
-		srcSftp.Close()
+		// srcSftp.Close()
 		fts.Pool.Put(srcServer, srcClient)
 		fts.Pool.Put(destServer, destClient)
 		fmt.Println(4)
@@ -304,16 +303,6 @@ func (fts *FileTransferServiceImpl) CreateTransferBetween2STask(srcServer, srcPa
 		fmt.Println(8)
 		return "", err
 	}
-
-	// 关闭SFTP客户端
-	// if err := srcSftp.Close(); err != nil {
-	// 	log.Printf("源SFTP客户端关闭失败: %v", err)
-	// 	fmt.Println(9)
-	// }
-	// if err := destSftp.Close(); err != nil  {
-	// 	log.Printf("目的SFTP客户端关闭失败: %v", err)
-	// 	fmt.Println(10)
-	// }
 
 	// 传输完成后放回连接
 	fts.Pool.Put(srcServer, srcClient)
