@@ -103,8 +103,8 @@ func TransferBetweenTwoServers(c *gin.Context) {
 	if g.FTS.Pool.Connections[request.SourceServer] == nil {
 		// 如果不存在，则创建并添加到池中
 		err = trans.CreateConnectionToPool(g.Pool, request.SourceServer, request.SourceUser, request.SourceAuth)
-		if err!= nil {
-			log.Printf("创建与源服务器的连接失败: %v", err)	
+		if err != nil {
+			log.Printf("创建与源服务器的连接失败: %v", err)
 			c.JSON(400, gin.H{"message": fmt.Sprint("创建与源服务器的连接失败: %v", err)})
 			return
 		}
@@ -113,10 +113,10 @@ func TransferBetweenTwoServers(c *gin.Context) {
 	if g.FTS.Pool.Connections[request.TargetServer] == nil {
 		// 如果不存在，则创建并添加到池中
 		err = trans.CreateConnectionToPool(g.Pool, request.TargetServer, request.TargetUser, request.TargetAuth)
-		if err!= nil {
+		if err != nil {
 			log.Printf("创建与目标服务器的连接失败: %v", err)
 			c.JSON(400, gin.H{"message": fmt.Sprint("创建与目标服务器的连接失败: %v", err)})
-			return	
+			return
 		}
 	}
 
@@ -128,7 +128,7 @@ func TransferBetweenTwoServers(c *gin.Context) {
 		request.TargetPath,   // 目标文件路径
 	)
 	if err != nil {
-		log.Fatalf("文件传输失败: %v", err)
+		log.Println("文件传输失败: %v", err)
 	}
 
 	fmt.Printf("文件传输任务已启动，任务ID: %s\n", taskID)
@@ -170,10 +170,10 @@ func CommonUpload(c *gin.Context) {
 	if g.FTS.Pool.Connections[request.Server] == nil {
 		// 如果不存在，则创建并添加到池中
 		err = trans.CreateConnectionToPool(g.Pool, request.Server, request.User, request.Auth)
-		if err!= nil {
+		if err != nil {
 			log.Printf("创建与目标服务器的连接失败: %v", err)
 			c.JSON(400, gin.H{"message": fmt.Sprint("创建与目标服务器的连接失败: %v", err)})
-			return	
+			return
 		}
 	}
 
@@ -218,10 +218,10 @@ func CommonDownload(c *gin.Context) {
 	if g.FTS.Pool.Connections[request.Server] == nil {
 		// 如果不存在，则创建并添加到池中
 		err = trans.CreateConnectionToPool(g.Pool, request.Server, request.User, request.Auth)
-		if err!= nil {
+		if err != nil {
 			log.Printf("创建与目标服务器的连接失败: %v", err)
 			c.JSON(400, gin.H{"message": fmt.Sprint("创建与目标服务器的连接失败: %v", err)})
-			return	
+			return
 		}
 	}
 	// 执行文件传输任务
