@@ -52,7 +52,7 @@ func ListAgent(c *gin.Context) {
 
 	// 查询数据库，过滤出当前用户的主机
 	query := `
-		SELECT id, host_name, os, platform, kernel_arch, created_at
+		SELECT id, host_name, ip, os, platform, kernel_arch, created_at
 		FROM host_info
 		WHERE user_name = $1 AND created_at BETWEEN $2 AND $3
 	`
@@ -68,7 +68,7 @@ func ListAgent(c *gin.Context) {
 	var hosts []model.HostInfo
 	for rows.Next() {
 		var host model.HostInfo
-		if err := rows.Scan(&host.ID, &host.Hostname, &host.OS, &host.Platform, &host.KernelArch, &host.CreatedAt); err != nil {
+		if err := rows.Scan(&host.ID, &host.Hostname, &host.IP, &host.OS, &host.Platform, &host.KernelArch, &host.CreatedAt); err != nil {
 			log.Println(logs.GetLogPrefix(2)+"Failed to scan host_info; details:", err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan host_info", "details": err.Error()})
 			return

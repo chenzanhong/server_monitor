@@ -65,6 +65,7 @@ type Claims struct {
 type HostInfo struct {
 	ID         int       `json:"id"` // 添加 ID 字段
 	Hostname   string    `json:"host_name"`
+	IP         string    `json:"ip"`
 	OS         string    `json:"os"`
 	Platform   string    `json:"platform"`
 	KernelArch string    `json:"kernel_arch"`
@@ -141,10 +142,10 @@ func InsertHostInfo(hostInfo HostInfo, username string) error {
 	} else {
 		// 插入新的主机记录
 		insertSQL := `
-        INSERT INTO host_info (host_name, os, platform, kernel_arch, created_at, user_name)
-        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, $5)
+        INSERT INTO host_info (host_name, ip, os, platform, kernel_arch, created_at, user_name)
+        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6)
         RETURNING id, host_name`
-		err = DB.QueryRow(insertSQL, hostInfo.Hostname, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch, username).Scan(&hostInfoID, &hostname)
+		err = DB.QueryRow(insertSQL, hostInfo.Hostname, hostInfo.IP, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch, username).Scan(&hostInfoID, &hostname)
 		if err != nil {
 			fmt.Printf("Failed to insert host_info: %v\n", err)
 			return err
@@ -692,8 +693,8 @@ func UpdateHostInfo(db *sql.DB, host_id int, host_info map[string]string) error 
 	}
 
 	_, err = db.Exec(
-		"UPDATE host_info SET host_name = $1, os = $2, platform = $3, kernel_arch = $4 WHERE host_id = $6",
-		host_info["Hostname"], host_info["OS"], host_info["Platform"], host_info["KernelArch"], host_id,
+		"UPDATE host_info SET host_name = $1, ip = $2, os = $3, platform = $4, kernel_arch = $5 WHERE host_id = $6",
+		host_info["Hostname"], host_info["IP"], host_info["OS"], host_info["Platform"], host_info["KernelArch"], host_id,
 	)
 	if err != nil {
 		return err

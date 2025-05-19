@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS host_info (
 	id SERIAL PRIMARY KEY,
     user_name VARCHAR, -- REFERENCES users(name),
 	host_name VARCHAR(255)  UNIQUE,
+	ip VARCHAR(255)  UNIQUE,
 	company_id INT, -- REFERENCES company(id),
 	os TEXT NOT NULL,
 	platform TEXT NOT NULL,
@@ -490,12 +491,13 @@ func insertHostInfo(tx *gorm.DB) error {
 
 		userName := parts[0]
 		hostname := parts[1]
-		companyId := parts[2]
-		os := parts[3]
-		platform := parts[4]
-		kernelArch := parts[5]
+		ip := parts[2]
+		companyId := parts[3]
+		os := parts[4]
+		platform := parts[5]
+		kernelArch := parts[6]
 
-		if err := tx.Exec("INSERT INTO host_info (user_name, host_name, company_id, os, platform, kernel_arch) VALUES (?, ?, ?, ?, ?, ?)", userName, hostname, companyId, os, platform, kernelArch).Error; err != nil {
+		if err := tx.Exec("INSERT INTO host_info (user_name, host_name, ip, company_id, os, platform, kernel_arch) VALUES (?, ?, ?, ?, ?, ?, ?)", userName, hostname, ip, companyId, os, platform, kernelArch).Error; err != nil {
 			return fmt.Errorf("failed to insert host_info for %s: %w", hostname, err)
 		}
 	}
