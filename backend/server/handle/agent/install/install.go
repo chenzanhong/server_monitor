@@ -70,6 +70,7 @@ func InstallAgent(c *gin.Context) {
 	// 插入 host_info 表
 	var hostInfo model.HostInfo
 	hostInfo.Hostname = agentInfo.Host_Name
+	hostInfo.IP = agentInfo.Host
 	hostInfo.OS = agentInfo.OS
 	hostInfo.Platform = agentInfo.Platform
 	hostInfo.KernelArch = agentInfo.KernelArch
