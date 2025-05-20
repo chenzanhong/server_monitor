@@ -112,7 +112,7 @@ func main() {
 	// 	log.Fatalf("Failed to connect to redis: %v", err)
 	// }
 	// 初始化SSH连接池及文件传输服务
-	g.Pool = trans.NewSSHConnectionPool(10, 5*time.Minute)
+	g.Pool = trans.NewSSHConnectionPool(10, 10*time.Minute)
 	stopChan := make(chan struct{})
 	defer close(stopChan)
 	go g.Pool.Cleanup(stopChan)          // 启动清理协程
@@ -163,5 +163,5 @@ func main() {
 		auth.POST("/transfer", transfer.TransferBetweenTwoServers)
 	}
 	router.POST("/agent/addSystem_info", monitor.ReceiveAndStoreSystemMetrics)
-	router.Run("0.0.0.0:9080")
+	router.Run("0.0.0.0:8080")
 }

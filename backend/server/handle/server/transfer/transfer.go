@@ -11,12 +11,8 @@ import (
 	"strings"
 	"time"
 
-	// "backend/server/handle/server/transfer/global"
 	g "backend/server/handle/server/transfer/global"
 	trans "backend/server/handle/server/transfer/trans-init" // 请替换为您的实际项目路径
-
-	// m_init "backend/server/model/init"
-	// u "backend/server/model/user"
 
 	"github.com/gin-gonic/gin"
 )
@@ -80,7 +76,7 @@ func TransferBetweenTwoServers(c *gin.Context) {
 
 	flag, err := CheckServerBelongs(Username.(string), request.SourceServer)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprint("查询源服务器是否属于用户（所在公司）失败: %v", err.Error())})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("查询源服务器是否属于用户（所在公司）失败: %v", err.Error())})
 		return
 	}
 	if !flag {
@@ -89,7 +85,7 @@ func TransferBetweenTwoServers(c *gin.Context) {
 	}
 	flag, err = CheckServerBelongs(Username.(string), request.TargetServer)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprint("查询目标服务器是否属于用户（所在公司）失败: %v", err.Error())})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("查询目标服务器是否属于用户（所在公司）失败: %v", err.Error())})
 		return
 	}
 	if !flag {
@@ -107,7 +103,7 @@ func TransferBetweenTwoServers(c *gin.Context) {
 		err = trans.CreateConnectionToPool(g.Pool, request.SourceServer, request.SourceUser, request.SourceAuth)
 		if err != nil {
 			log.Printf("创建与源服务器的连接失败: %v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint("创建与源服务器的连接失败: %v", err)})
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("创建与源服务器的连接失败: %v", err)})
 			return
 		}
 	}
@@ -117,7 +113,7 @@ func TransferBetweenTwoServers(c *gin.Context) {
 		err = trans.CreateConnectionToPool(g.Pool, request.TargetServer, request.TargetUser, request.TargetAuth)
 		if err != nil {
 			log.Printf("创建与目标服务器的连接失败: %v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint("创建与目标服务器的连接失败: %v", err)})
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("创建与目标服务器的连接失败: %v", err)})
 			return
 		}
 	}
@@ -136,14 +132,14 @@ func TransferBetweenTwoServers(c *gin.Context) {
 	}
 
 	fmt.Printf("文件传输任务已完成，任务ID: %s\n", taskID)
-	c.JSON(200, gin.H{"message": "文件传输完成", "task_id": taskID})
+	c.JSON(http.StatusOK, gin.H{"message": "文件传输完成", "task_id": taskID})
 }
 
 // 客户端与一个指定的服务器进行文件传输，上传
 func CommonUpload(c *gin.Context) {
 	Username, exists := c.Get("username") // 从上下文中获取用户名
 	if !exists {
-		c.JSON(401, gin.H{"message": "未登录"})
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "未登录"})
 		return
 	}
 
@@ -156,7 +152,7 @@ func CommonUpload(c *gin.Context) {
 	// 检查服务器是否属于用户所在的公司或是否是用户自己的服务器
 	flag, err := CheckServerBelongs(Username.(string), request.Server)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprint("查询服务器是否属于用户（所在公司）失败: %v", err)})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("查询服务器是否属于用户（所在公司）失败: %v", err)})
 		return
 	}
 	if !flag {
@@ -177,7 +173,7 @@ func CommonUpload(c *gin.Context) {
 		err = trans.CreateConnectionToPool(g.Pool, request.Server, request.User, request.Auth)
 		if err != nil {
 			log.Printf("创建与目标服务器的连接失败: %v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint("创建与目标服务器的连接失败: %v", err)})
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("创建与目标服务器的连接失败: %v", err)})
 			return
 		}
 	}
@@ -195,13 +191,14 @@ func CommonUpload(c *gin.Context) {
 	}
 
 	fmt.Printf("文件上传任务已完成，任务ID: %s\n", taskID)
+	c.JSON(http.StatusOK, gin.H{"message": "文件上传完成", "task_id": taskID})
 }
 
 // 客户端与一个指定的服务器进行文件传输，下载
 func CommonDownload(c *gin.Context) {
 	Username, exists := c.Get("username") // 从上下文中获取用户名
 	if !exists {
-		c.JSON(401, gin.H{"message": "未登录"})
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "未登录"})
 		return
 	}
 	var request CommonTransRequest
@@ -265,7 +262,7 @@ func CommonDownload(c *gin.Context) {
 
 	filename := path.Base(request.Path)
 	encodedFilename := url.PathEscape(filename)
-	fmt.Println(filename + "\n" + encodedFilename)
+	// fmt.Println(filename + "\n" + encodedFilename)
 	c.Header("Content-Type", "application/octet-stream")
 	c.Header("Content-Disposition", "attachment; "+fmt.Sprintf(`filename="%s"; filename*=UTF-8''%s`,
 		encodedFilename, encodedFilename))
