@@ -209,7 +209,7 @@ func CommonDownload(c *gin.Context) {
 
 	flag, err := CheckServerBelongs(Username.(string), request.Server)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprint("查询服务器是否属于用户（所在公司）失败: %v", err)})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("查询服务器是否属于用户（所在公司）失败: %v", err)})
 		return
 	}
 	if !flag {
@@ -222,7 +222,7 @@ func CommonDownload(c *gin.Context) {
 		err = trans.CreateConnectionToPool(g.Pool, request.Server, request.User, request.Auth)
 		if err != nil {
 			log.Printf("创建与目标服务器的连接失败: %v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint("创建与目标服务器的连接失败: %v", err)})
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("创建与目标服务器的连接失败: %v", err)})
 			return
 		}
 	}

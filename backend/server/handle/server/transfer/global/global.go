@@ -105,7 +105,10 @@ func (p *SSHConnectionPool) Put(server string, client *ssh.Client) {
 	// 判断新连接是否有效
 	if !isConnectionValid(client) {
 		fmt.Println("Put：无效的连接")
-		client.Close()
+		if client == p.Connections[server].Client { // 新旧连接相同
+			client.Close()                // 关闭旧连接
+			delete(p.Connections, server) // 删除旧连接
+		}
 		return
 	}
 
@@ -113,7 +116,9 @@ func (p *SSHConnectionPool) Put(server string, client *ssh.Client) {
 	if oldConn, exists := p.Connections[server]; exists {
 		if isConnectionValid(oldConn.Client) {
 			oldConn.UsedAt = time.Now() // 更新使用时间
-			// 不client.Close()，因为这个client与oldClient是tong
+			// 不client.Close()，因为这个client与oldConn.Client是同一个
+			// 只是更新了oldConn.UsedAt，而不是关闭oldConn.Client
+			p.Connections[server] = oldConn
 			return
 		} else {
 			_ = oldConn.Client.Close()    // 关闭旧连接
@@ -141,7 +146,8 @@ func isConnectionValid(client *ssh.Client) bool {
 	}
 	defer session.Close()
 
-	_, err = session.CombinedOutput("echo 'alive'") // 尝试获取会话输出流，检查连接是否有效
+	// _, err = session.StdoutPipe() // 尝试获取会话输出流，检查连接是否有效
+	_, err = session.CombinedOutput("whoami") // 检查连接是否有效
 	return err == nil
 }
 
