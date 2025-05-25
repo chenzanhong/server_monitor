@@ -51,45 +51,19 @@ func ListAgent(c *gin.Context) {
 		return
 	}
 
-	// 查询数据库，返回所有字段
-	query := `
-		SELECT id, user_name, host_name, ip, os, platform, kernel_arch, created_at, company_id
-		FROM host_info
-		WHERE user_name = $1 AND created_at BETWEEN $2 AND $3
-	`
-
-	rows, err := model.DB.Query(query, username, fromTime, toTime)
-	if err != nil {
-		log.Println(logs.GetLogPrefix(2)+"Failed to query host_info; details:", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query host_info", "details": err.Error()})
-		return
-	}
-	defer rows.Close()
-
+	// 使用 GORM 查询
 	var hosts []u.HostInfo
-	for rows.Next() {
-		var host u.HostInfo
-		// 注意：如果字段允许为 NULL（比如 company_id 是可空的），需要使用 sql.NullInt64 等类型处理
-		if err := rows.Scan(
-			&host.ID,
-			&host.UserName,
-			&host.Hostname,
-			&host.IP,
-			&host.OS,
-			&host.Platform,
-			&host.KernelArch,
-			&host.CreatedAt,
-			&host.CompanyID,
-		); err != nil {
-			log.Println(logs.GetLogPrefix(2)+"Failed to scan host_info; details:", err.Error())
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan host_info", "details": err.Error()})
-			return
-		}
-		hosts = append(hosts, host)
-	}
-	if err := rows.Err(); err != nil {
-		log.Println(logs.GetLogPrefix(2)+"Error occurred during iteration; details:", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error occurred during iteration", "details": err.Error()})
+	result := m_init.DB.Table("host_info").
+		Where("user_name = ? AND created_at BETWEEN ? AND ?", username, fromTime, toTime).
+		Order("created_at DESC"). // 可选排序
+		Find(&hosts)
+
+	if result.Error != nil {
+		log.Println(logs.GetLogPrefix(2)+"Failed to query host_info; details:", result.Error.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to query host_info",
+			"details": result.Error.Error(),
+		})
 		return
 	}
 

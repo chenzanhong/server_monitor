@@ -64,15 +64,16 @@ type Claims struct {
 
 // HostInfo 结构体对应 host_info 数据库表
 type HostInfo struct {
-	ID         int       `json:"id"`        // 添加 ID 字段
-	UserName   string    `json:"user_name"` // 新增字段对应 user_name
-	Hostname   string    `json:"host_name"` // 原名 host_name
-	IP         string    `json:"ip"`
-	OS         string    `json:"os"`
-	Platform   string    `json:"platform"`
-	KernelArch string    `json:"kernel_arch"`
-	CreatedAt  time.Time `json:"host_info_created_at"` // 对应 created_at
-	CompanyID  *int      `json:"company_id,omitempty"` // 新增字段对应 company_id, 使用指针类型表示可选值
+	ID            int       `json:"id"` // 添加 ID 字段
+	UserName      string    `json:"user_name"`      // 新增字段对应 user_name
+	Hostname      string    `json:"host_name"`      // 原名 host_name
+	IP            string    `json:"ip"`
+	OS            string    `json:"os"`
+	Platform      string    `json:"platform"`
+	KernelArch    string    `json:"kernel_arch"`
+	CreatedAt     time.Time `json:"host_info_created_at"` // 对应 created_at
+	Token         string    `json:"token"`
+	CompanyID     *int      `json:"company_id,omitempty"` // 新增字段对应 company_id, 使用指针类型表示可选值
 }
 
 type CPUInfo struct {
@@ -348,7 +349,7 @@ func InsertSSHKeys(hostname string, sshkey string) error {
 	return nil
 }
 
-func InsertNotices(send string, receive string, content string) error {
+func InsertNotices(send string,receive string , content string) error{
 	var exist bool
 	//检查users中是否存在发送者和接收者
 	querySQL := fmt.Sprintf(`
@@ -356,7 +357,7 @@ func InsertNotices(send string, receive string, content string) error {
 		SELECT 1 
 		FROM users 
 		WHERE name IN ('%s', '%s')
-	);`, send, receive)
+	);`,send,receive)
 	err := DB.QueryRow(querySQL).Scan(&exist)
 	if err != nil && err != sql.ErrNoRows {
 		return fmt.Errorf("failed to query users: %v", err)
@@ -371,7 +372,7 @@ func InsertNotices(send string, receive string, content string) error {
 		SELECT 1 
 		FROM notices 
 		WHERE send = '%s' AND receive = '%s'
-	);`, send, receive)
+	);`,send,receive)
 	err = DB.QueryRow(querySQL, send, receive).Scan(&exist)
 	if err != nil && err != sql.ErrNoRows {
 		return fmt.Errorf("failed to query notices: %v", err)
@@ -384,7 +385,7 @@ func InsertNotices(send string, receive string, content string) error {
 		SET 
 		    content= $1,
 		WHERE send = $2 AND receive = $3`
-		_, err = DB.Exec(updateSQL, content, send, receive)
+		_, err= DB.Exec(updateSQL, content, send, receive)
 		if err != nil {
 			fmt.Printf("Failed to update notices's content: %v\n", err)
 			return err
