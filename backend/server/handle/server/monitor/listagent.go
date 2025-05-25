@@ -2,7 +2,7 @@ package monitor
 
 import (
 	"backend/server/logs"
-	"backend/server/model"
+	m_init "backend/server/model/init"
 	u "backend/server/model/user"
 	"log"
 	"net/http"
