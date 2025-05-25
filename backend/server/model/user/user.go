@@ -46,14 +46,15 @@ type Notice struct {
 
 // host_info表
 type HostInfo struct {
-	ID         int    `json:"id" gorm:"primarykey;autoIncrement"`
-	UserName   string `json:"user_name" gorm:"column:user_name"` // 用户名
-	HostName   string `json:"host_name" gorm:"column:host_name"` // 主机名
-	CompanyID  int    `json:"company_id" gorm:"column:company_id"` // 公司ID
-	OS         string `json:"os" gorm:"column:os"` // 操作系统
-	Platform   string `json:"platform" gorm:"column:platform"` // 平台
-	KernelArch string `json:"kernel_arch" gorm:"column:kernel_arch"` // 内核架构
-	CreatedAt  string `json:"created_at" gorm:"column:created_at"` // 创建时间
+	ID            int       `json:"id"` // 添加 ID 字段
+	UserName      string    `json:"user_name"`      // 新增字段对应 user_name
+	Hostname      string    `json:"host_name"`      // 原名 host_name
+	IP            string    `json:"ip"`
+	OS            string    `json:"os"`
+	Platform      string    `json:"platform"`
+	KernelArch    string    `json:"kernel_arch"`
+	CreatedAt     string `json:"host_info_created_at"` // 对应 created_at
+	CompanyID     *int      `json:"company_id,omitempty"` // 新增字段对应 company_id, 使用指针类型表示可选值
 }
 
 // TableName 指定表名

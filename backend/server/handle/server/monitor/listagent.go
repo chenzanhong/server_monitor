@@ -3,6 +3,7 @@ package monitor
 import (
 	"backend/server/logs"
 	"backend/server/model"
+	u "backend/server/model/user"
 	"log"
 	"net/http"
 	"time"
@@ -50,9 +51,9 @@ func ListAgent(c *gin.Context) {
 		return
 	}
 
-	// 查询数据库，过滤出当前用户的主机
+	// 查询数据库，返回所有字段
 	query := `
-		SELECT id, host_name, ip, os, platform, kernel_arch, created_at
+		SELECT id, user_name, host_name, ip, os, platform, kernel_arch, created_at, company_id
 		FROM host_info
 		WHERE user_name = $1 AND created_at BETWEEN $2 AND $3
 	`
@@ -65,10 +66,21 @@ func ListAgent(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var hosts []model.HostInfo
+	var hosts []u.HostInfo
 	for rows.Next() {
-		var host model.HostInfo
-		if err := rows.Scan(&host.ID, &host.Hostname, &host.IP, &host.OS, &host.Platform, &host.KernelArch, &host.CreatedAt); err != nil {
+		var host u.HostInfo
+		// 注意：如果字段允许为 NULL（比如 company_id 是可空的），需要使用 sql.NullInt64 等类型处理
+		if err := rows.Scan(
+			&host.ID,
+			&host.UserName,
+			&host.Hostname,
+			&host.IP,
+			&host.OS,
+			&host.Platform,
+			&host.KernelArch,
+			&host.CreatedAt,
+			&host.CompanyID,
+		); err != nil {
 			log.Println(logs.GetLogPrefix(2)+"Failed to scan host_info; details:", err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan host_info", "details": err.Error()})
 			return
@@ -81,5 +93,5 @@ func ListAgent(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, hosts)
+	c.JSON(http.StatusOK, gin.H{"hosts": hosts})
 }
