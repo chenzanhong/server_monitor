@@ -9,6 +9,7 @@ import (
 	"backend/server/handle/server/transfer"
 	g "backend/server/handle/server/transfer/global"
 	trans "backend/server/handle/server/transfer/trans-init"
+	e "backend/server/handle/email"
 	"backend/server/handle/user/info"
 	"backend/server/handle/user/login"
 	"backend/server/handle/user/update"
@@ -161,6 +162,9 @@ func main() {
 		auth.POST("/upload", transfer.CommonUpload)
 		auth.POST("/download", transfer.CommonDownload)
 		auth.POST("/transfer", transfer.TransferBetweenTwoServers)
+
+		// 邮件
+		auth.POST("/sendemail", e.SendEmailHandler)
 	}
 	router.POST("/agent/addSystem_info", monitor.ReceiveAndStoreSystemMetrics)
 	router.Run("0.0.0.0:8080")
