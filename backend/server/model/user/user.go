@@ -42,7 +42,7 @@ type Notice struct {
 	Receive  string `json:"receive" gorm:"column:receive"`
 	Content  string `json:"content" gorm:"column:content"`
 	State    string `json:"state" gorm:"column:state"`
-	CreateAt string `json:"create_at" gorm:"column:created_at"`
+	CreateAt string `json:"created_at" gorm:"column:created_at"`
 }
 
 // host_info表
