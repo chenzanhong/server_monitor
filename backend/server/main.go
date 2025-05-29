@@ -169,6 +169,9 @@ func main() {
 
 		// 邮件
 		auth.POST("/sendemail", e.SendEmailHandler)
+
+		// 日志
+		auth.POST("/getuseroperationlogs", logs.GetUserOperationLogs) // 获取用户操作日志，支持按时间段、操作类型、按用户名筛选
 	}
 	router.POST("/agent/addSystem_info", monitor.ReceiveAndStoreSystemMetrics)
 	router.Run("0.0.0.0:8080")
