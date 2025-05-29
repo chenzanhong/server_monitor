@@ -3,6 +3,7 @@ package email
 import (
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -70,7 +71,7 @@ func SendEmailHandler(c *gin.Context) {
 			"code":    http.StatusBadRequest,
 			"success": false,
 			"message": "参数错误",
-			"error":   err.Error(),	
+			"error":   err.Error(),
 		})
 		return
 	}
@@ -103,13 +104,49 @@ func SendEmailHandler(c *gin.Context) {
 	})
 }
 
-// // 使用 sendEmail 函数来发送密码重置邮件
-// func SendResetPasswordEmail(email, token string) error {
-// 	subject := "Password Reset Request"
-// 	body := fmt.Sprintf(`
-//         <h1>密码找回</h1>
-//         <p>这是你的验证码：%s</p>
-//     `, token)
+// 发送重置密码邮件，包含验证码
+func SendResetPasswordEmail(email, token string) error {
+	myEmail := os.Getenv("EMAIL_NAME")
+	myPassword := os.Getenv("EMAIL_PASSWORD")
+	baseUrl := os.Getenv("BASE_URL")
+	smtpServerHost := os.Getenv("SMTP_SERVER_HOST")
+	smtpServerPortStr := os.Getenv("SMTP_SERVER_PORT")
 
-// 	return SendEmail(email, subject, body)
-// }
+	if myEmail == "" || myPassword == "" || smtpServerHost == "" || smtpServerPortStr == "" {
+		log.Fatalf("环境变量未正确设置")
+		return errors.New("环境变量未正确设置")
+	}
+
+	smtpServerPort, err := strconv.Atoi(smtpServerPortStr)
+	if err != nil {
+		log.Fatalf("将端口号转换为整数时出错: %v", err)
+		return err
+	}
+
+	log.Printf("Email: %s, Password: %s, SMTP Server: %s, Port: %d, BaseUrl: %s", myEmail, myPassword, smtpServerHost, smtpServerPort, baseUrl)
+
+	m := gomail.NewMessage()
+	m.SetHeader("From", myEmail)
+	m.SetHeader("To", email)
+	m.SetHeader("Subject", "Password Reset Request")
+	m.SetBody("text/html", fmt.Sprintf(`
+		<h1>密码找回</h1>
+		<p>这是你的验证码：%s</p>
+	`, token))
+
+	d := gomail.NewDialer(smtpServerHost, smtpServerPort, myEmail, myPassword)
+	d.TLSConfig = &tls.Config{InsecureSkipVerify: true} // 跳过证书验证，生产环境中应谨慎使用
+	if err := d.DialAndSend(m); err != nil {
+		log.Printf("发送邮件失败: %v", err)
+		if strings.Contains(err.Error(), "535") { // 例如，检查错误消息中是否包含 SMTP 身份验证失败的代码
+			log.Printf("可能是 SMTP 身份验证错误")
+			return errors.New("发送邮件失败可能是 SMTP 身份验证错误")
+		} else if strings.Contains(err.Error(), "connection refused") {
+			log.Printf("SMTP 服务器连接被拒绝")
+			return errors.New("发送邮件失败：SMTP 服务器连接被拒绝")
+		}
+	} else {
+		log.Println("邮件发送成功")
+	}
+	return nil
+}

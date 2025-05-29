@@ -5,14 +5,15 @@ import (
 	"backend/server/handle/admin"
 	"backend/server/handle/agent/install"
 	"backend/server/handle/company"
-	"backend/server/handle/server/monitor" // 引入 monitor 包
-	"backend/server/handle/server/transfer"
-	g "backend/server/handle/server/transfer/global"
-	trans "backend/server/handle/server/transfer/trans-init"
 	e "backend/server/handle/email"
+	"backend/server/handle/server/monitor" // 引入 monitor 包
+	"backend/server/handle/transfer"
+	g "backend/server/handle/transfer/global"
+	trans "backend/server/handle/transfer/trans-init"
 	"backend/server/handle/user/info"
 	"backend/server/handle/user/login"
 	"backend/server/handle/user/update"
+	"backend/server/logs"
 	"backend/server/middlewire"
 	"backend/server/middlewire/cors"
 	db "backend/server/model/init"
@@ -44,6 +45,9 @@ func main() {
 	//	}
 	//	os.Exit(0)
 	//}()
+
+	logs.InitZapSugarDefault()
+
 	//读取DBConfig.yaml文件
 	config, err := config.LoadConfig()
 	if err != nil {

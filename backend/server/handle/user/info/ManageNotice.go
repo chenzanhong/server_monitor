@@ -38,7 +38,7 @@ func ManageNotice(c *gin.Context) {
 	var notice m_user.Notice
 	// 处理注册公司的申请时的权限判断
 	if notice.Receive == "root" && strings.Contains(notice.Content, "注册") && strings.Contains(notice.Content, "申请") {
-		// 判断是否有权限
+		// 判断是否有权限，也可以改为直接是否 username == "root"
 		var user m_user.User
 		if err := m_init.DB.Where("name = ?", username).First(&user).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "查询用户失败"})

@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS users (
     is_verified BOOLEAN DEFAULT FALSE,
     role_id INT REFERENCES roles(id) DEFAULT 0,
     company_id INT DEFAULT 0,
-	token TEXT,
+	token TEXT, -- 存储更新密码时使用的唯一凭证，用于验证用户身份与验证码是否匹配
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -11,6 +11,7 @@ type User struct {
 	RoleId     int    `json:"role_id" gorm:"column:role_id;default:0"` // 2:ROOT: , 1: ADMIN, 0: USER
 	CompanyId  int    `json:"company_id" gorm:"column:company_id;default:0"`
 	IsVerified bool   `json:"is_verified" gorm:"column:is_verified"`
+	Token      string `json:"token" gorm:"column:token"`
 }
 
 type Company struct {
@@ -36,25 +37,25 @@ type SSHKey struct {
 }
 
 type Notice struct {
-	ID            	int    `json:"id" gorm:"primarykey;autoIncrement"`
-	Send      		string `json:"send" gorm:"column:send"`
-	Receive 		string `json:"receive" gorm:"column:receive"`
-	Content       	string `json:"content" gorm:"column:content"`
-	State       	string `json:"state" gorm:"column:state"`
-	CreateAt    	string `json:"create_at" gorm:"column:created_at"`
+	ID       int    `json:"id" gorm:"primarykey;autoIncrement"`
+	Send     string `json:"send" gorm:"column:send"`
+	Receive  string `json:"receive" gorm:"column:receive"`
+	Content  string `json:"content" gorm:"column:content"`
+	State    string `json:"state" gorm:"column:state"`
+	CreateAt string `json:"create_at" gorm:"column:created_at"`
 }
 
 // host_info表
 type HostInfo struct {
-	ID            int       `json:"id"` // 添加 ID 字段
-	UserName      string    `json:"user_name"`      // 新增字段对应 user_name
-	Hostname      string    `json:"host_name"`      // 原名 host_name
-	IP            string    `json:"ip"`
-	OS            string    `json:"os"`
-	Platform      string    `json:"platform"`
-	KernelArch    string    `json:"kernel_arch"`
-	CreatedAt     string `json:"host_info_created_at"` // 对应 created_at
-	CompanyID     *int      `json:"company_id,omitempty"` // 新增字段对应 company_id, 使用指针类型表示可选值
+	ID         int    `json:"id"`        // 添加 ID 字段
+	UserName   string `json:"user_name"` // 新增字段对应 user_name
+	Hostname   string `json:"host_name"` // 原名 host_name
+	IP         string `json:"ip"`
+	OS         string `json:"os"`
+	Platform   string `json:"platform"`
+	KernelArch string `json:"kernel_arch"`
+	CreatedAt  string `json:"host_info_created_at"` // 对应 created_at
+	CompanyID  int    `json:"company_id,omitempty"` // 新增字段对应 company_id, 使用指针类型表示可选值
 }
 
 // TableName 指定表名

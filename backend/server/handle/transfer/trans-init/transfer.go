@@ -1,7 +1,7 @@
 package transCreateControl
 
 import (
-	g "backend/server/handle/server/transfer/global"
+	g "backend/server/handle/transfer/global"
 	"fmt"
 	"log"
 	"time"

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	// "backend/server/handle/server/transfer/global"
-	trans "backend/server/handle/server/transfer/trans-init" // 请替换为您的实际项目路径
+	trans "backend/server/handle/transfer/trans-init" // 请替换为您的实际项目路径
 )
 
 func main() {
