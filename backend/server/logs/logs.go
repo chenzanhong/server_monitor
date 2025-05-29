@@ -59,6 +59,7 @@ func SetupZapSugar(path string, level zapcore.Level) {
 	}
 
 	encoderConfig := zap.NewProductionEncoderConfig()
+	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	encoder := zapcore.NewJSONEncoder(encoderConfig)
 
 	core := zapcore.NewCore(
@@ -73,9 +74,11 @@ func SetupZapSugar(path string, level zapcore.Level) {
 }
 
 type Log struct {
+	Level     string `json:"level"`
 	Timestamp string `json:"ts"`
 	Msg       string `json:"msg"`
 	Username  string `json:"username"`
+	Detail    string `json:"detail"`
 }
 
 type LogRequest struct {
@@ -86,8 +89,8 @@ type LogRequest struct {
 }
 
 // 过滤日志的核心逻辑
-func FilterLogs(scanner *bufio.Scanner, logRequest LogRequest, username string) []string {
-	var logs []string
+func FilterLogs(scanner *bufio.Scanner, logRequest LogRequest, username string) []Log {
+	var logs []Log
 	var _log Log
 
 	for scanner.Scan() {
@@ -110,7 +113,7 @@ func FilterLogs(scanner *bufio.Scanner, logRequest LogRequest, username string) 
 		// 时间范围筛选
 		if (logRequest.FromTime == "" || _log.Timestamp >= logRequest.FromTime) &&
 			(logRequest.ToTime == "" || _log.Timestamp <= logRequest.ToTime) {
-			logs = append(logs, line)
+			logs = append(logs, _log)
 		}
 	}
 
@@ -144,7 +147,7 @@ func GetUserOperationLogs(c *gin.Context) {
 
 	scanner := bufio.NewScanner(file)
 
-	var logs []string
+	var logs []Log
 	if username == "root" { // 管理员
 		if logRequest.Username == "" {
 			logs = FilterLogs(scanner, logRequest, "")
