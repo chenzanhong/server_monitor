@@ -95,9 +95,9 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	//连接TDengine数据库
-	if err := db.ConnectTDengine(); err != nil {
-		log.Fatalf("Failed to connect to TDengine database: %v", err)
-	}
+	// if err := db.ConnectTDengine(); err != nil {
+	// 	log.Fatalf("Failed to connect to TDengine database: %v", err)
+	// }
 
 	// 初始化数据库
 	if err := db.InitDB(); err != nil {
@@ -109,9 +109,9 @@ func main() {
 		log.Fatalf("Failed to initialize data: %v", err)
 	}
 	//初始化TDengine
-	if err := db.InitTDengine(); err != nil {
-		log.Fatalf("Failed to initialize TDengine: %v", err)
-	}
+	// if err := db.InitTDengine(); err != nil {
+	// 	log.Fatalf("Failed to initialize TDengine: %v", err)
+	// }
 	// 初始化redis
 	// if err := db.InitRedis(); err!= nil {
 	// 	log.Fatalf("Failed to connect to redis: %v", err)

@@ -9,8 +9,10 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	// "github.com/zeromicro/go-zero/core/logx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -68,7 +70,8 @@ func SetupZapSugar(path string, level zapcore.Level) {
 		level,
 	)
 
-	logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+	// logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+	logger := zap.New(core)
 
 	Sugar = logger.Sugar()
 }
@@ -88,10 +91,30 @@ type LogRequest struct {
 	Operation string `json:"operation" form:"operation"`
 }
 
+const timeFormat = "2006-01-02T15:04:05.999Z0700" // iso8601格式
+
 // 过滤日志的核心逻辑
 func FilterLogs(scanner *bufio.Scanner, logRequest LogRequest, username string) []Log {
 	var logs []Log
 	var _log Log
+	var fromTime, toTime, logTime time.Time
+	var err error
+
+	if logRequest.FromTime != "" {
+		fromTime, err = time.Parse(timeFormat, logRequest.FromTime)
+		if err != nil {
+			// logx.Errorf("解析开始时间失败：%v", err)
+			return nil
+		}
+	}
+
+	if logRequest.ToTime != "" {
+		toTime, err = time.Parse(timeFormat, logRequest.ToTime)
+		if err != nil {
+			// logx.Errorf("解析结束时间失败：%v", err)
+			return nil
+		}
+	}
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -110,11 +133,22 @@ func FilterLogs(scanner *bufio.Scanner, logRequest LogRequest, username string) 
 			continue
 		}
 
-		// 时间范围筛选
-		if (logRequest.FromTime == "" || _log.Timestamp >= logRequest.FromTime) &&
-			(logRequest.ToTime == "" || _log.Timestamp <= logRequest.ToTime) {
-			logs = append(logs, _log)
+		logTime, err = time.Parse(timeFormat, _log.Timestamp)
+		if err != nil {
+			log.Printf("解析日志时间失败：%v", err)
+			fmt.Println(0)
+			continue
 		}
+
+		// 时间范围筛选
+		if logRequest.FromTime != "" && logTime.Before(fromTime) {
+			continue
+		}
+		if logRequest.ToTime != "" && logTime.After(toTime) {
+			continue
+		}
+
+		logs = append(logs, _log)
 	}
 
 	return logs

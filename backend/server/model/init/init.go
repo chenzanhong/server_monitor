@@ -273,14 +273,14 @@ func InitDB() error {
 	}
 
 	//初始化TDengine数据库
-	if TDengineDB == nil {
-		return fmt.Errorf("TDengine database connection is not initialized") // 检查数据库连接是否已初始化
-	}
+	// if TDengineDB == nil {
+	// 	return fmt.Errorf("TDengine database connection is not initialized") // 检查数据库连接是否已初始化
+	// }
 
 	// 创建超级表
-	if _, err := TDengineDB.Exec(systemSuperTable); err != nil {
-		return err
-	}
+	// if _, err := TDengineDB.Exec(systemSuperTable); err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
