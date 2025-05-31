@@ -157,6 +157,7 @@ func main() {
 		auth.POST("/replaceadmin", admin.ReplaceAdmin)        // 更换管理员
 
 		// 监控
+		auth.GET("/script", install.GenerateScript) // 动态获取脚本
 		auth.POST("/install", install.InstallAgent)
 		auth.GET("/list", monitor.ListAgent)
 		auth.GET("/monitor/:hostname", monitor.GetAgentInfo)

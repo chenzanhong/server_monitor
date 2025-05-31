@@ -103,7 +103,7 @@ func FilterLogs(scanner *bufio.Scanner, logRequest LogRequest, username string) 
 	if logRequest.FromTime != "" {
 		fromTime, err = time.Parse(timeFormat, logRequest.FromTime)
 		if err != nil {
-			// logx.Errorf("解析开始时间失败：%v", err)
+			log.Printf("解析开始时间失败：%v", err)
 			return nil
 		}
 	}
@@ -111,7 +111,7 @@ func FilterLogs(scanner *bufio.Scanner, logRequest LogRequest, username string) 
 	if logRequest.ToTime != "" {
 		toTime, err = time.Parse(timeFormat, logRequest.ToTime)
 		if err != nil {
-			// logx.Errorf("解析结束时间失败：%v", err)
+			log.Printf("解析结束时间失败：%v", err)
 			return nil
 		}
 	}
