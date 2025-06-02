@@ -1,8 +1,8 @@
 package info
 
 import (
-	m_init "cmd/server/model/init"
-	u "cmd/server/model/user"
+	m_init "backend/server/model/init"
+	u "backend/server/model/user"
 	"log"
 	"net/http"
 
@@ -42,7 +42,7 @@ func GetAllUserInfo(c *gin.Context) {
 		})
 	}
 
-	if username.(string) != "root" {
+	if username.(string) != "ROOT" {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "用户没有权限"})
 		return
 	}

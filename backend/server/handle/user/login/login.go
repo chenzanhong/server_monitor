@@ -1,7 +1,7 @@
 package login
 
 import (
-	"cmd/server/middlewire"
+	"backend/server/middlewire"
 	"errors"
 	"net/http"
 	"regexp"
@@ -12,8 +12,8 @@ import (
 	_ "github.com/lib/pq"
 	"gorm.io/gorm"
 
-	m_init "cmd/server/model/init"
-	u "cmd/server/model/user"
+	m_init "backend/server/model/init"
+	u "backend/server/model/user"
 )
 
 // RegisterRequest 定义注册请求的数据结构
@@ -101,20 +101,32 @@ func Register(c *gin.Context) {
 	err = m_init.DB.Where("name =?", input.Company).First(&company).Error
 	if err == nil {
 		companyId = company.ID
-	}else if errors.Is(err, gorm.ErrRecordNotFound) {
+	} else if errors.Is(err, gorm.ErrRecordNotFound) {
 		companyId = 0
-	}else{
+	} else {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询公司失败"})
-		return	
+		return
 	}
-	
+	// // 检查公司名是否存在
+	// var company u.Company
+	// companyId := 0
+	// err = m_init.DB.Where("name =?", input.Company).First(&company).Error
+	// if err == nil {
+	// 	companyId = company.ID
+	// } else if errors.Is(err, gorm.ErrRecordNotFound) {
+	// 	companyId = 0
+	// } else {
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询公司失败"})
+	// 	return
+	// }
+
 	// 创建用户
 	newUser := u.User{
 		Name:       input.Name,
 		Email:      input.Email,
 		Password:   input.Password,
 		RoleId:     0,
-		CompanyId:  companyId,
+		CompanyId:  companyId, //companyId,
 		IsVerified: true,
 	}
 	err = m_init.DB.Create(&newUser).Error
@@ -181,9 +193,17 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// 查询用户角色
+	var role u.Role
+	if err := m_init.DB.Table("roles").Where("id = ?", user.RoleId).First(&role).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "查询用户角色失败"})
+		return
+	}
+
 	// 登录成功
 	c.JSON(http.StatusOK, gin.H{
 		"message": "登录成功",
+		"role":    role.Name,
 		"token":   tokenString,
 	})
 }

@@ -17,6 +17,7 @@ Thumbs.db
 __pycache__/
 
 # 忽略构建和编译输出
+.idea
 .idea/
 .vscode/
 dist/
@@ -83,7 +84,7 @@ Dockerfile
 Dockerfile.*
 
 # 忽略日志文件
-logs/
+logs/logs/
 
 # 忽略配置文件
 config.jsonya
@@ -117,6 +118,7 @@ coverage/
 # 忽略IDE和编辑器生成的文件
 .vscode/
 .idea/
+*.xml
 *.iml
 *.ipynb_checkpoints/
 *.swp
@@ -156,3 +158,6 @@ coverage/
 # 忽略测试目录
 oss_test/
 tdengine_test/
+.idea/material_theme_project_new.xml
+.idea/servermanage.iml
+frontend/

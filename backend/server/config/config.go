@@ -18,6 +18,15 @@ type DBConfig struct {
 	Password string `yaml:"password"`
 }
 
+// TDengineConfig 用于保存TDengine数据库配置
+type TDengineConfig struct {
+	Host     string `yaml:"host"`
+	Port     string `yaml:"port"`
+	Name     string `yaml:"name"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+}
+
 type OSSConfig struct {
 	OSS_REGION            string `yaml:"OSS_REGION"`
 	OSS_ACCESS_KEY_ID     string `yaml:"OSS_ACCESS_KEY_ID"`
@@ -26,9 +35,10 @@ type OSSConfig struct {
 }
 
 type RedisConfig struct {
-	Addr     string `yaml:"redis_addr"`
-	Password string `yaml:"redis_password"`
-	DB       string `yaml:"redis_db"`
+	Host     string `yaml:"host"`
+	Port     string `yaml:"port"`
+	Password string `yaml:"password"`
+	DB       string `yaml:"db"`
 }
 
 type EMAILConfig struct {
@@ -44,6 +54,7 @@ type SMTPServerConfig struct {
 // Config 用于保存所有配置项
 type Config struct {
 	DB         DBConfig         `yaml:"db"`
+	TDengine   TDengineConfig   `yaml:"tdengine"`
 	OSS        OSSConfig        `yaml:"oss"`
 	Redis      RedisConfig      `yaml:"redis"`
 	Email      EMAILConfig      `yaml:"email"`
@@ -66,7 +77,7 @@ func getDBConfigPath() string {
 	// 将路径转换为绝对路径并简化路径
 	absPath, err := filepath.Abs(dbConfigPath)
 	if err != nil {
-		log.Fatalf("无法获取绝对路径: %v", err)
+		log.Printf("无法获取绝对路径: %v", err)
 	}
 
 	simplifiedPath := filepath.Clean(absPath)

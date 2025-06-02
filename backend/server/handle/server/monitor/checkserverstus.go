@@ -1,32 +1,88 @@
 package monitor
 
 import (
-	"cmd/server/model"
+	"backend/server/logs"
+	"backend/server/model"
+	"backend/server/redis"
+	"context"
+	"database/sql"
 	"log"
 	"time"
 )
 
-// 定时检查服务器状态
 func CheckServerStatus() {
-	db, err := model.InitDB()
+	ctx := context.Background()
+
+	// 初始化数据库
+	db, _, err := model.InitDB()
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer db.Close()
 
-	for {
-		time.Sleep(5 * time.Minute)
+	// 定时任务
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
 
-		// 查找超过 5 分钟没有更新的服务器
-		query := `
-        UPDATE hostandtoken 
-        SET status = 'offline'
-        WHERE NOW() - last_heartbeat > INTERVAL '5 minutes' AND status != 'offline'`
-		_, err = db.Exec(query)
+	for {
+		select {
+		case <-ticker.C:
+			checkAndUpdateStatus(ctx, db)
+		}
+	}
+}
+
+// 检查并更新状态
+func checkAndUpdateStatus(ctx context.Context, db *sql.DB) {
+	// 获取所有主机的键
+	var cursor uint64
+	var keys []string
+	var err error
+
+	for {
+		// 使用 SCAN 命令遍历所有主机键
+		keys, cursor, err = redis.Rdb.Scan(ctx, cursor, "host:*", 100).Result()
 		if err != nil {
-			log.Printf("Failed to update offline status: %v", err)
-		} else {
-			log.Println("Server status check completed")
+			log.Printf("%sError scanning Redis keys: %v\n", logs.GetLogPrefix(2), err)
+			return
+		}
+
+		// 检查每个主机的最后更新时间
+		for _, key := range keys {
+			// 获取主机的最后更新时间
+			lastUpdatedStr, err := redis.Rdb.HGet(ctx, key, "last_updated").Result()
+			if err != nil {
+				log.Printf("%sError getting last_updated for key %s: %v\n", logs.GetLogPrefix(2), key, err)
+				continue
+			}
+
+			// 解析时间
+			lastUpdated, err := time.Parse(time.RFC3339, lastUpdatedStr)
+			if err != nil {
+				log.Printf("%sError parsing last_updated for key %s: %v\n", logs.GetLogPrefix(2), key, err)
+				continue
+			}
+
+			// 检查是否超过 5 分钟未更新
+			if time.Since(lastUpdated) > 5*time.Minute {
+				// 更新 hostandtoken 表
+				hostname := key[len("host:"):] // 提取主机名
+				query := `
+                UPDATE hostandtoken 
+                SET status = 'offline', last_heartbeat = $1
+                WHERE host_name = $2`
+				_, err := db.Exec(query, lastUpdated, hostname)
+				if err != nil {
+					log.Printf("%sFailed to update status for host %s: %v\n", logs.GetLogPrefix(2), hostname, err)
+				} else {
+					log.Printf("%sUpdated status for host %s to offline\n", logs.GetLogPrefix(2), hostname)
+				}
+			}
+		}
+
+		// 如果遍历完成，退出循环
+		if cursor == 0 {
+			break
 		}
 	}
 }

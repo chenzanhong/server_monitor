@@ -1,17 +1,25 @@
 package main
 
 import (
-	"cmd/server/config"
-	"cmd/server/handle/admin"
-	"cmd/server/handle/agent/install"
-	"cmd/server/handle/server/monitor" // 引入 monitor 包
-	"cmd/server/handle/user/info"
-	"cmd/server/handle/user/login"
-	"cmd/server/handle/user/update"
-	"cmd/server/middlewire"
-	"cmd/server/middlewire/cors"
-	db "cmd/server/model/init"
-	"fmt"
+	"backend/server/config"
+	"backend/server/handle/admin"
+	"backend/server/handle/agent/install"
+	"backend/server/handle/company"
+	e "backend/server/handle/email"
+	"backend/server/handle/server/monitor" // 引入 monitor 包
+	"backend/server/handle/transfer"
+	g "backend/server/handle/transfer/global"
+	trans "backend/server/handle/transfer/trans-init"
+	"backend/server/handle/user/info"
+	"backend/server/handle/user/login"
+	"backend/server/handle/user/update"
+	"backend/server/logs"
+	"backend/server/middlewire"
+	"backend/server/middlewire/cors"
+	db "backend/server/model/init"
+	"backend/server/redis"
+	"time"
+
 	"log"
 	"os"
 
@@ -22,22 +30,42 @@ import (
 )
 
 func main() {
-	go monitor.CheckServerStatus() //读取DBConfig.yaml文件
-	go monitor.CheckServerStatus() //读取DBConfig.yaml文件
+
+	//ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	//defer stop()
+
+	//go func() {
+	//	<-ctx.Done()
+	//	// 执行连接关闭
+	//	if err := model.DB.Close(); err != nil {
+	//		log.Printf("Failed to close database connection: %v", err)
+	//	}
+	//	if err := model.TDengine.Close(); err != nil {
+	//		log.Printf("Failed to close TDengine connection: %v", err)
+	//	}
+	//	os.Exit(0)
+	//}()
+
+	logs.InitZapSugarDefault()
+
+	//读取DBConfig.yaml文件
 	config, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("加载配置失败: %v", err)
 	}
 
-	fmt.Println("-----------------------")
-
-	fmt.Println("-----------------------")
 	//设置数据库连接的环境变量
 	os.Setenv("DB_USER", config.DB.User)
 	os.Setenv("DB_PASSWORD", config.DB.Password)
 	os.Setenv("DB_HOST", config.DB.Host)
 	os.Setenv("DB_PORT", config.DB.Port)
 	os.Setenv("DB_NAME", config.DB.Name)
+	//设置TDengine数据库连接的环境变量
+	os.Setenv("TDENGINE_USER", config.TDengine.User)
+	os.Setenv("TDENGINE_PASSWORD", config.TDengine.Password)
+	os.Setenv("TDENGINE_HOST", config.TDengine.Host)
+	os.Setenv("TDENGINE_PORT", config.TDengine.Port)
+	os.Setenv("TDENGINE_NAME", config.TDengine.Name)
 	// OSS服务
 	os.Setenv("OSS_REGION", config.OSS.OSS_REGION)
 	os.Setenv("OSS_ACCESS_KEY_ID", config.OSS.OSS_ACCESS_KEY_ID)
@@ -50,35 +78,53 @@ func main() {
 	os.Setenv("SMTP_SERVER_HOST", config.SMTPServer.Host)
 	os.Setenv("SMTP_SERVER_PORT", config.SMTPServer.Port)
 	// Redis服务
-	os.Setenv("REDIS_ADDR", config.Redis.Addr)
+	os.Setenv("REDIS_HOST", config.Redis.Host)
 	os.Setenv("REDIS_PASSWORD", config.Redis.Password)
+	os.Setenv("REDIS_PORT", config.Redis.Port)
 	os.Setenv("REDIS_DB", config.Redis.DB)
-
-	// fmt.Println(os.Getenv("DB_USER"))
-	// fmt.Println(os.Getenv("DB_PASSWORD"))
-	// fmt.Println(os.Getenv("DB_HOST"))
-	// fmt.Println(os.Getenv("DB_PORT"))
-	// fmt.Println(os.Getenv("DB_NAME"))
 
 	router := gin.Default()
 	router.Use(cors.CORSMiddleware())
+	// 初始化 Redis 连接
+	if err := redis.InitRedis(); err != nil {
+		log.Fatalf("Failed to initialize Redis: %v", err)
+	}
+
 	// 连接数据库
 	if err := db.ConnectDatabase(); err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
+	//连接TDengine数据库
+	// if err := db.ConnectTDengine(); err != nil {
+	// 	log.Fatalf("Failed to connect to TDengine database: %v", err)
+	// }
+
 	// 初始化数据库
 	if err := db.InitDB(); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
+
 	// 初始化数据库数据
 	if err := db.InitDBData(); err != nil {
 		log.Fatalf("Failed to initialize data: %v", err)
 	}
+	//初始化TDengine
+	// if err := db.InitTDengine(); err != nil {
+	// 	log.Fatalf("Failed to initialize TDengine: %v", err)
+	// }
 	// 初始化redis
 	// if err := db.InitRedis(); err!= nil {
 	// 	log.Fatalf("Failed to connect to redis: %v", err)
 	// }
+	// 初始化SSH连接池及文件传输服务
+	g.Pool = trans.NewSSHConnectionPool(10, 10*time.Minute)
+	stopChan := make(chan struct{})
+	defer close(stopChan)
+	go g.Pool.Cleanup(stopChan)          // 启动清理协程
+	trans.NewFileTransferService(g.Pool) // 初始化文件传输服务
+	g.FTS = trans.NewFileTransferService(g.Pool)
 
+	go monitor.CheckServerStatus()
 	router.Static("/static", "./static")
 
 	// 注册 Swagger 路由
@@ -95,18 +141,39 @@ func main() {
 		auth.POST("/updateUserInfo", update.UpdateUserInfo)
 		router.POST("/reset_password", update.ResetPassword)
 		auth.POST("/request_reset_password", update.RequestResetPassword)
+		auth.GET("/info/recivelist", info.GetReceiveList) //获取该用户作为接收者所接收到的所有信息
+		auth.GET("/info/sendlist", info.GetSendList)      //获取该用户作为发送者所发送的所有信息
+		auth.POST("/info/manage", info.ManageNotice)      //处理通知状态
 
-		// 公司管理员操作
-		auth.POST("/addMember", admin.AddMember)	// 添加成员
-		auth.POST("/deleteMembers", admin.DeleteMember)	// 批量删除成员
-		auth.GET("/getCompanyInfo", admin.GetCompanyInfo)	// 公司信息（含成员信息）
-		
+		// 系统/公司管理员操作
+		auth.POST("/registercompany", company.Register)       //注册公司
+		auth.POST("/addMember", admin.AddMember)              // 添加成员
+		auth.POST("/deleteMembers", admin.DeleteMember)       // 批量删除成员
+		auth.GET("/getmemberinfo", admin.GetMemberInfo)       // 获取公司成员信息
+		auth.GET("/get-company-info", admin.GetCompanyInfo)   // 指定公司的信息（含成员信息）
+		auth.GET("/get-company-list", company.GetCompanyList) // 公司列表
+		auth.POST("/sshkey", admin.AddSShkey)                 // 添加SSH密钥
+		auth.POST("/joincompany", admin.JoinCompany)          // 邀请成员加入公司
+		auth.POST("/replaceadmin", admin.ReplaceAdmin)        // 更换管理员
+
 		// 监控
+		auth.GET("/script", install.GenerateScript) // 动态获取脚本
 		auth.POST("/install", install.InstallAgent)
-		auth.POST("/addSystemInfo", monitor.ReceiveAndStoreSystemMetrics)
 		auth.GET("/list", monitor.ListAgent)
-		router.GET("/monitor/:hostname", monitor.GetAgentInfo)
-	}
+		auth.GET("/monitor/:hostname", monitor.GetAgentInfo)
+		auth.GET("/monitor/status/:hostname", monitor.GetLatestSystemInfo)
 
+		// 文件传输
+		auth.POST("/upload", transfer.CommonUpload)
+		auth.POST("/download", transfer.CommonDownload)
+		auth.POST("/transfer", transfer.TransferBetweenTwoServers)
+
+		// 邮件
+		auth.POST("/sendemail", e.SendEmailHandler)
+
+		// 日志
+		auth.POST("/getuseroperationlogs", logs.GetUserOperationLogs) // 获取用户操作日志，支持按时间段、操作类型、按用户名筛选
+	}
+	router.POST("/agent/addSystem_info", monitor.ReceiveAndStoreSystemMetrics)
 	router.Run("0.0.0.0:8080")
 }
