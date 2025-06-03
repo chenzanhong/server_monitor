@@ -5,6 +5,7 @@ import (
 	"log"
 	"path/filepath"
 	"runtime"
+	"strconv"
 
 	"gopkg.in/yaml.v2"
 )
@@ -51,6 +52,14 @@ type SMTPServerConfig struct {
 	Port string `yaml:"SMTPServer_port"`
 }
 
+type Script struct {
+	StartPort string `yaml:"start_port"`
+	EndPort   string `yaml:"end_port"`
+	SshTunnelUsername string `yaml:"ssh_tunnel_username"`
+	PublicServerIP string `yaml:"public_server_ip"`
+	GithubRepoUrl  string `yaml:"github_repo_url"`
+}
+
 // Config 用于保存所有配置项
 type Config struct {
 	DB         DBConfig         `yaml:"db"`
@@ -59,7 +68,16 @@ type Config struct {
 	Redis      RedisConfig      `yaml:"redis"`
 	Email      EMAILConfig      `yaml:"email"`
 	SMTPServer SMTPServerConfig `yaml:"smtp_server"`
+	Script     Script           `yaml:"script"`
 }
+
+var (
+	StartPort      int
+	EndPort        int
+	PublicServerIP string
+	GithubRepoUrl  string
+	SshTunnelUsername string
+)
 
 // getDBConfigPath 获取数据库配置文件的路径
 func getDBConfigPath() string {
@@ -105,6 +123,19 @@ func LoadConfig() (*Config, error) {
 		log.Printf("解析配置文件失败: %v", err)
 		return nil, err
 	}
+	StartPort, err = strconv.Atoi(config.Script.StartPort)
+	if err != nil {
+		log.Printf("Atoi(config.SSHPort.StartPort)失败: %v", err)
+		return nil, err
+	}
+	EndPort, err = strconv.Atoi(config.Script.EndPort)
+	if err != nil {
+		log.Printf("Atoi(config.SSHPort.EndPort)失败: %v", err)
+		return nil, err
+	}
+	PublicServerIP = config.Script.PublicServerIP
+	GithubRepoUrl = config.Script.GithubRepoUrl
+	SshTunnelUsername = config.Script.SshTunnelUsername
 
 	return &config, nil
 }

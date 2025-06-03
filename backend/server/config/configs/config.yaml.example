@@ -31,3 +31,10 @@ email:
 smtp_server:
   SMTPServer_host: smtp.163.com
   SMTPServer_port: 465  # 25 在服务器上会被限制
+
+script:
+  github_repo_url: https://gitee.com/wu-jinhao111/agent.git # agent仓库地址
+  start_port: 10000 # 反向SSH可用的最小端口
+  end_port: 45000 # 反向SSH最大端口
+  ssh_tunnel_username: reversessh # 反向SSH服务器用户名
+  public_server_ip: 113.44.170.52 # 反向SSH服务器公网IP

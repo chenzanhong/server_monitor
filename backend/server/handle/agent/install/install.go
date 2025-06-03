@@ -90,12 +90,13 @@ func InstallAgent(c *gin.Context) {
 		return
 	}
 
-	// 安装agent
-	err = DoInstallAgent(agentInfo)
-	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	// 改为在前端向用户展示下载、安装、执行代理的步骤，后端只负责数据库操作
+	// // 安装agent
+	// err = DoInstallAgent(agentInfo)
+	// if err != nil {
+	// 	c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	// 	return
+	// }
 
 	// 安装成功，返回成功信息
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "Agent installed successfully", "host_name": agentInfo.Host_Name, "token": agentInfo.Token})
