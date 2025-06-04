@@ -1,5 +1,7 @@
 package model
 
+import "time"
+
 // import "time"
 
 type User struct {
@@ -61,4 +63,12 @@ type HostInfo struct {
 // TableName 指定表名
 func (HostInfo) TableName() string {
 	return "host_info" // 数据库表名对应
+}
+
+type SSHPort struct {
+	ID         int       `json:"id"`
+	Port       int       `json:"port" gorm:"column:port"`
+	IsUsed     bool      `json:"is_used" gorm:"default:false"`
+	AssignedTo string    `json:"assigned_to" gorm:"column:assigned_to"`
+	UpdatedAt  time.Time `json:"update_at" gorm:"column:"update_at"`
 }

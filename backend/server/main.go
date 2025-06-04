@@ -3,7 +3,9 @@ package main
 import (
 	"backend/server/config"
 	"backend/server/handle/admin"
+	"backend/server/handle/agent/getscript"
 	"backend/server/handle/agent/install"
+	pt "backend/server/handle/agent/port"
 	"backend/server/handle/company"
 	e "backend/server/handle/email"
 	"backend/server/handle/server/monitor" // 引入 monitor 包
@@ -132,6 +134,8 @@ func main() {
 
 	router.POST("/agent/register", login.Register)
 	router.POST("/agent/login", login.Login)
+	router.GET("/agentscript", getscript.GetAgentScript) // 获取安装代理程序的脚本
+
 	// 需要 JWT 认证的路由
 	auth := router.Group("/agent", middlewire.JWTAuthMiddleware())
 	{
@@ -157,11 +161,16 @@ func main() {
 		auth.POST("/replaceadmin", admin.ReplaceAdmin)        // 更换管理员
 
 		// 监控
-		auth.GET("/script", install.GenerateScript) // 动态获取脚本
 		auth.POST("/install", install.InstallAgent)
 		auth.GET("/list", monitor.ListAgent)
 		auth.GET("/monitor/:hostname", monitor.GetAgentInfo)
 		auth.GET("/monitor/status/:hostname", monitor.GetLatestSystemInfo)
+
+		// 脚本
+		auth.GET("/agentscript", getscript.GetAgentScript)       // 获取安装代理程序的脚本
+		auth.GET("/sshscript", getscript.GetSSHScript)           // 获取配置反向ssh的脚本
+		auth.GET("/combinedscript", getscript.GetCombinedScript) // 获取合并后的脚本——包含安装代理程序和配置反向SSH隧道
+		auth.GET("/port/get", pt.GetAvailablePort)               // 获取用于生成ssh脚本所需要的端口port
 
 		// 文件传输
 		auth.POST("/upload", transfer.CommonUpload)
@@ -174,6 +183,7 @@ func main() {
 		// 日志
 		auth.POST("/getuseroperationlogs", logs.GetUserOperationLogs) // 获取用户操作日志，支持按时间段、操作类型、按用户名筛选
 	}
+
 	router.POST("/agent/addSystem_info", monitor.ReceiveAndStoreSystemMetrics)
 	router.Run("0.0.0.0:8080")
 }

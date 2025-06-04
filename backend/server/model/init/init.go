@@ -1,6 +1,7 @@
 package init
 
 import (
+	cf "backend/server/config"
 	u "backend/server/model/user"
 	"bufio"
 	"context"
@@ -102,6 +103,15 @@ CREATE TABLE IF NOT EXISTS ssh_keys (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ssh_port表，用于生成配置反向ssh的脚本
+CREATE TABLE IF NOT EXISTS ssh_ports (
+	id SERIAL PRIMARY KEY,
+    port INT,
+    is_used BOOLEAN NOT NULL DEFAULT FALSE,
+    assigned_to TEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- notice 表
 CREATE TABLE IF NOT EXISTS notices (
     id SERIAL PRIMARY KEY,
@@ -127,28 +137,6 @@ CREATE INDEX IF NOT EXISTS idx_hostandtoken_host_name ON hostandtoken(host_name)
 -- 如果经常按last_heartbeat查询或排序，可以在此字段上创建索引
 CREATE INDEX IF NOT EXISTS idx_hostandtoken_last_heartbeat ON hostandtoken(last_heartbeat);
 `
-
-// cpu_info示例，每次一新的数据就追加进json里面，这样可以保存多个时间戳的数据
-// [
-//   {
-//     "data": [
-//       {
-//         "id": 0,
-//         "percent": 25.5,
-//         "cores_num": 6,
-//         "model_name": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
-//       },
-//       {
-//         "id": 0,
-//         "percent": 25.5,
-//         "cores_num": 6,
-//         "model_name": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
-//       }
-//     ],
-//     "time": "2025-03-11T13:13:30Z"
-//   },
-//   ……
-// ]
 
 // 创建system的超级表
 const systemSuperTable = `
@@ -376,6 +364,13 @@ func InitDBData() error {
 	}
 	fmt.Println("7---------------")
 
+	// 插入端口池数据
+	if err := initPortPool(tx); err != nil {
+		tx.Rollback()
+		return err
+	}
+	fmt.Println("8---------------")
+
 	if err := tx.Commit().Error; err != nil {
 		return err // 返回提交事务时的错误
 	}
@@ -418,6 +413,11 @@ func insertRoles(tx *gorm.DB) error {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
+		// 检查是否以 "//" 开头
+		if strings.HasPrefix(line, "//") {
+			fmt.Println("Encountered a comment line, exiting the loop.")
+			break // 退出循环
+		}
 		parts := strings.Split(line, ",")
 		if len(parts) < 3 {
 			return fmt.Errorf("invalid line format: %s", line)
@@ -735,44 +735,16 @@ func insertNotices(tx *gorm.DB) error {
 	return scanner.Err()
 }
 
-// -- cpu表
-// CREATE TABLE IF NOT EXISTS cpu_info (
-// 	id SERIAL PRIMARY KEY,
-// 	host_id INT REFERENCES host_info(id),
-// 	model_name TEXT NOT NULL,
-// 	cores_num INT NOT NULL,
-// 	percent NUMERIC(5,2) NOT NULL,
-// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// );
-
-// -- memory 表
-// CREATE TABLE IF NOT EXISTS memory_info (
-// 	id SERIAL PRIMARY KEY,
-// 	host_id INT REFERENCES host_info(id),
-// 	total NUMERIC(10,2) NOT NULL,
-// 	available NUMERIC(10,2) NOT NULL,
-// 	used NUMERIC(10,2) NOT NULL,
-// 	free NUMERIC(10,2) NOT NULL,
-// 	user_percent NUMERIC(5,2) NOT NULL,
-// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// );
-
-// -- process 表
-// CREATE TABLE IF NOT EXISTS process_info (
-// 	id SERIAL PRIMARY KEY,
-// 	host_id INT REFERENCES host_info(id),
-// 	pid INT NOT NULL,
-// 	cpu_percent NUMERIC(5,2) NOT NULL,
-// 	mem_percent NUMERIC(5,2) NOT NULL,
-// 	cmdline TEXT NOT NULL,
-// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// );
-
-// -- net_info表
-// CREATE TABLE IF NOT EXISTS network_info (
-// 	id SERIAL PRIMARY KEY,
-// 	host_id INT REFERENCES host_info(id),
-// 	bytesrecv BIGINT NOT NULL,
-// 	bytessent BIGINT NOT NULL,
-// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-//);
+// insertPortPool 函数从 portpool.txt 文件中读取端口池数据
+func initPortPool(tx *gorm.DB) error {
+	startPort := cf.StartPort
+	endPort := cf.EndPort
+	time := time.Now()
+	for port := startPort; port <= endPort; port++ {
+		err := tx.Create(&u.SSHPort{Port: port, UpdatedAt: time}).Error
+		if err != nil {
+			return fmt.Errorf("failed to insert port %d: %w", port, err)
+		}
+	}
+	return nil
+}
