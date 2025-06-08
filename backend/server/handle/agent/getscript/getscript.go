@@ -3,6 +3,9 @@ package getscript
 import (
 	cf "backend/server/config"
 	pt "backend/server/handle/agent/port"
+	m_init "backend/server/model/init"
+	u "backend/server/model/user"
+	"bytes"
 	"net/http"
 	"text/template"
 
@@ -14,7 +17,10 @@ const agentTemplate = `#!/bin/bash
 set -e
 
 GITHUB_REPO="{{ .GithubRepoUrl }}"
-AGENT_DIR="$HOME/agent/agent"
+HOSTNAME="{{ .HostName }}"
+TOKEN={{ .Token }}
+AGENT_DIR="$HOME/monitor"
+SUDO=""
 
 # 安装依赖
 detect_os() {
@@ -63,31 +69,31 @@ esac
 mkdir -p "$AGENT_DIR"
 cd "$AGENT_DIR"
 
-if [ ! -f "main" ]; then
-  git clone "$GITHUB_REPO" .
-fi
+git clone "$GITHUB_REPO" .
+cd agent/agent || exit
 
+# 授予执行权限并运行主程序
 chmod +x main
-./main -hostname="$(hostname)" &
+./main -hostname="${HOSTNAME}" -token="${TOKEN}" &
 
-cat > /tmp/main_startup.service <<EOF
+cat > /tmp/monitor_agent.service <<EOF
 [Unit]
 Description=Main Program Startup Service
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=$AGENT_DIR/main -hostname=$(hostname)
+ExecStart=$AGENT_DIR/agent/agent/main -hostname="${HOSTNAME}" -token="${TOKEN}"
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-sudo mv /tmp/main_startup.service /etc/systemd/system/main_startup.service
-sudo systemctl daemon-reload
-sudo systemctl enable main_startup.service
-sudo systemctl start main_startup.service
+${SUDO}  mv /tmp/monitor_agent.service /etc/systemd/system/monitor_agent.service
+${SUDO}  systemctl daemon-reload
+${SUDO}  systemctl enable monitor_agent.service
+${SUDO}  systemctl start monitor_agent.service
 
 echo "[+] Agent 安装完成！已启动 agent 服务"
 `
@@ -167,22 +173,59 @@ echo "[+] 反向 SSH 隧道配置完成！已启动隧道（端口: $SSH_TUNNEL_
 
 // 获取安装代理程序的脚本
 func GetAgentScript(c *gin.Context) {
+	hostname := c.Query("hostname")
 	tmpl, err := template.New("agent").Parse(agentTemplate)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
+
+	// 查询token
+	var hostandtoken u.HostAndToken
+	err = m_init.DB.Where("host_name = ?", hostname).First(&hostandtoken).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, "查询hostandtoken表失败："+err.Error())
+		return
+	}
+
 	c.Header("Content-Type", "application/octet-stream")
 	c.Header("Content-Disposition", "attachment; filename=install_agent.sh")
 
 	err = tmpl.Execute(c.Writer, struct {
 		GithubRepoUrl string
+		HostName      string
+		Token         string
 	}{
 		GithubRepoUrl: cf.GithubRepoUrl,
+		HostName:      hostname,
+		Token:         hostandtoken.Token,
 	})
+
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 	}
+}
+
+func GenerateAgentScriptBytes(hostname, token string) ([]byte, error) {
+	tmpl, err := template.New("agent").Parse(agentTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, struct {
+		GithubRepoUrl string
+		HostName      string
+		Token         string
+	}{
+		GithubRepoUrl: cf.GithubRepoUrl,
+		HostName:      hostname,
+		Token:         token,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 // 获取配置反向SSH的脚本
@@ -217,13 +260,17 @@ func GetSSHScript(c *gin.Context) {
 	}
 }
 
+// 联合脚本
 const combinedScriptTemplate = `#!/bin/bash
 
 set -e
 
 # 第一部分：安装代理程序
 GITHUB_REPO="{{ .GithubRepoUrl }}"
-AGENT_DIR="$HOME/agent/agent"
+HOSTNAME="{{ .HostName }}"
+TOKEN={{ .Token }}
+AGENT_DIR="$HOME/monitor"
+SUDO=""
 
 # 安装依赖
 detect_os() {
@@ -272,31 +319,32 @@ esac
 mkdir -p "$AGENT_DIR"
 cd "$AGENT_DIR"
 
-if [ ! -f "main" ]; then
-  git clone "$GITHUB_REPO" .
-fi
+git clone "$GITHUB_REPO" .
+cd agent/agent || exit
 
+# 授予执行权限并运行主程序
 chmod +x main
-./main -hostname="$(hostname)" &
+./main -hostname="${HOSTNAME}" -token="${TOKEN}" &
 
-cat > /tmp/main_startup.service <<EOF
+
+cat > /tmp/monitor_agent.service <<EOF
 [Unit]
 Description=Main Program Startup Service
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=$AGENT_DIR/main -hostname=$(hostname)
+ExecStart=$AGENT_DIR/main -hostname="${HOSTNAME}" -token="${TOKEN}"
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-sudo mv /tmp/main_startup.service /etc/systemd/system/main_startup.service
+sudo mv /tmp/monitor_agent.service /etc/systemd/system/monitor_agent.service
 sudo systemctl daemon-reload
-sudo systemctl enable main_startup.service
-sudo systemctl start main_startup.service
+sudo systemctl enable monitor_agent.service
+sudo systemctl start monitor_agent.service
 
 echo "[+] Agent 安装完成！已启动 agent 服务"
 
@@ -362,9 +410,18 @@ echo "[+] 反向 SSH 隧道配置完成！已启动隧道（端口: $SSH_TUNNEL_
 
 // 获取合并后的脚本——包含安装代理程序和配置反向SSH隧道
 func GetCombinedScript(c *gin.Context) {
+	hostname := c.Query("hostname")
 	port, err := pt.GetUnusedPort()
 	if port == -1 {
 		c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"message": "获取脚本失败：" + err.Error()})
+		return
+	}
+
+	// 查询token
+	var hostandtoken u.HostAndToken
+	err = m_init.DB.Where("host_name = ?", hostname).First(&hostandtoken).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, "查询hostandtoken表失败："+err.Error())
 		return
 	}
 
@@ -380,11 +437,15 @@ func GetCombinedScript(c *gin.Context) {
 	data := struct {
 		GithubRepoUrl     string
 		PublicServerIP    string
+		HostName          string
+		Token             string
 		SshTunnelUsername string
 		Port              int
 	}{
 		GithubRepoUrl:     cf.GithubRepoUrl,
 		PublicServerIP:    cf.PublicServerIP,
+		HostName:          hostname,
+		Token:             hostandtoken.Token,
 		SshTunnelUsername: cf.SshTunnelUsername,
 		Port:              port,
 	}

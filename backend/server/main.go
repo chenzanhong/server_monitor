@@ -134,7 +134,7 @@ func main() {
 
 	router.POST("/agent/register", login.Register)
 	router.POST("/agent/login", login.Login)
-	router.GET("/agentscript", getscript.GetAgentScript) // 获取安装代理程序的脚本
+	router.GET("/defaultagentscript", getscript.GetAgentScript) // 获取安装代理程序的脚本
 
 	// 需要 JWT 认证的路由
 	auth := router.Group("/agent", middlewire.JWTAuthMiddleware())
