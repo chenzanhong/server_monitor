@@ -65,10 +65,18 @@ func (HostInfo) TableName() string {
 	return "host_info" // 数据库表名对应
 }
 
+type HostAndToken struct {
+	ID            int    `json:"id"`
+	HostName      string `json:"host_name"`
+	Token         string `json:"token"`
+	LastHeartBeat string `json:"last_heartbeat"`
+	Status        string `json:"status" gorm:"default 'offline'"`
+}
+
 type SSHPort struct {
 	ID         int       `json:"id"`
 	Port       int       `json:"port" gorm:"column:port"`
 	IsUsed     bool      `json:"is_used" gorm:"default:false"`
 	AssignedTo string    `json:"assigned_to" gorm:"column:assigned_to"`
-	UpdatedAt  time.Time `json:"update_at" gorm:"column:"update_at"`
+	UpdatedAt  time.Time `json:"update_at" gorm:"column:update_at"`
 }

@@ -2,6 +2,7 @@ package install
 
 import (
 	"backend/server/model"
+	gs "backend/server/handle/agent/getscript"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -98,8 +99,23 @@ func InstallAgent(c *gin.Context) {
 	// 	return
 	// }
 
+	scriptBytes, err := gs.GenerateAgentScriptBytes(agentInfo.Host, agentInfo.Token)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	// 设置响应头
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=install_agent.sh"))
+
+	// 返回脚本文件
+	if _, err := c.Writer.Write(scriptBytes); err != nil { // 注意检查 Write 的错误
+		log.Printf("InstallAgent: 写入响应体错误: %v", err)
+	}
+
 	// 安装成功，返回成功信息
-	c.IndentedJSON(http.StatusOK, gin.H{"message": "Agent installed successfully", "host_name": agentInfo.Host_Name, "token": agentInfo.Token})
+	// c.IndentedJSON(http.StatusOK, gin.H{"message": "Agent installed successfully", "host_name": agentInfo.Host_Name, "token": agentInfo.Token})
 }
 
 // 随机生成指定长度的随机token

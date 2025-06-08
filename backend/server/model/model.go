@@ -776,7 +776,7 @@ func UpdateSystemInfo(hostName string, hostInfo HostInfo, cpuInfo []CPUInfo, mem
 func UpdateToken(db *sql.DB, hostName string, token string, lastHeartBeat time.Time, status string) error {
 	//判断hostandtoken表是否存在该hostname
 	var existingName string
-	err := db.QueryRow("SELECT hos_tname FROM hostandtoken WHERE host_name = ", hostName).Scan(&existingName)
+	err := db.QueryRow("SELECT host_name FROM hostandtoken WHERE host_name = ", hostName).Scan(&existingName)
 	if err != nil {
 		return err
 	}

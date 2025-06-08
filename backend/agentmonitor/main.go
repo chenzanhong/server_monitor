@@ -1,7 +1,7 @@
 package main
 
 import (
-	"backend/agentmonitor/configs"
+	cf "backend/agentmonitor/config"
 	"backend/agentmonitor/data"
 	"flag"
 	"fmt"
@@ -19,7 +19,7 @@ func main() {
 	// 解析命令行参数
 	flag.Parse()
 	fmt.Printf("hostname:%s,token:%s\n", *hostName, *token)
-	config, err := configs.LoadConfig("./config/config.yaml")
+	config, err := cf.LoadConfig("./config/config.yaml")
 	if err != nil {
 		log.Fatalf("failed to open config file:%v", err)
 		return
