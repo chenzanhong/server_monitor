@@ -159,7 +159,7 @@ func InstallAgent(c *gin.Context) {
 	}
 
 	// 安装成功，返回成功信息
-	c.IndentedJSON(http.StatusOK, gin.H{"message": "Agent installed successfully", "host_name": agentInfo.Host_Name, "token": agentInfo.Token})
+	// c.IndentedJSON(http.StatusOK, gin.H{"message": "Agent installed successfully", "host_name": agentInfo.Host_Name, "token": agentInfo.Token})
 }
 
 // 随机生成指定长度的随机token
