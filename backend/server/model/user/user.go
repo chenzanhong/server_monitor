@@ -78,5 +78,5 @@ type SSHPort struct {
 	Port       int       `json:"port" gorm:"column:port"`
 	IsUsed     bool      `json:"is_used" gorm:"default:false"`
 	AssignedTo string    `json:"assigned_to" gorm:"column:assigned_to"`
-	UpdatedAt  time.Time `json:"update_at" gorm:"column:update_at"`
+	UpdatedAt  time.Time `json:"updated_at" gorm:"column:updated_at"`
 }
