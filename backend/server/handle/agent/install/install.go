@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"backend/server/redis"
@@ -18,17 +20,17 @@ import (
 )
 
 type SshInfo struct {
-	Host         string  `json:"host"`
-	User         string  `json:"user"`
-	Password     string  `json:"password"`
-	Port         int     `json:"port"`
-	Host_Name    string  `json:"host_name"`
-	OS           string  `json:"os"`
-	Platform     string  `json:"platform"`
-	KernelArch   string  `json:"kernel_arch"`
-	CPUThreshold float64 `json:"cputhreshold"`
-	MemThreshold float64 `json:"memthreshold"`
-	Token        string  `json:"token"`
+	Host         string `json:"host"`
+	User         string `json:"user"`
+	Password     string `json:"password"`
+	Port         int    `json:"port"`
+	Host_Name    string `json:"host_name"`
+	OS           string `json:"os"`
+	Platform     string `json:"platform"`
+	KernelArch   string `json:"kernel_arch"`
+	CPUThreshold string `json:"cputhreshold"`
+	MemThreshold string `json:"memthreshold"`
+	Token        string `json:"token"`
 }
 
 // InstallAgent 安装agent
@@ -113,8 +115,27 @@ func InstallAgent(c *gin.Context) {
 	hostInfo.Platform = agentInfo.Platform
 	hostInfo.KernelArch = agentInfo.KernelArch
 	hostInfo.Token = agentInfo.Token
-	hostInfo.CPUThreshold = agentInfo.CPUThreshold
-	hostInfo.MemThreshold = agentInfo.MemThreshold
+
+	// 将阈值字符串转换为 float64
+	cpuThresholdStr := agentInfo.CPUThreshold
+	memThresholdStr := agentInfo.MemThreshold
+	cpuThreshold, err := strconv.ParseFloat(strings.TrimSuffix(cpuThresholdStr, "%"), 64)
+	if err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid CPU threshold format"})
+		return
+	}
+	memThreshold, err := strconv.ParseFloat(strings.TrimSuffix(memThresholdStr, "%"), 64)
+	if err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid memory threshold format"})
+		return
+	}
+	cpuThreshold = cpuThreshold / 100.0
+	memThreshold = memThreshold / 100.0
+
+	hostInfo.CPUThreshold = cpuThreshold
+	hostInfo.MemThreshold = memThreshold
 	hostInfo.CreatedAt = time.Now()
 	hostInfo.CompanyID = company_id
 	err = model.InsertHostInfoTx(tx, hostInfo, username)
@@ -128,13 +149,13 @@ func InstallAgent(c *gin.Context) {
 	// 将阈值存入 Redis
 	memKey := fmt.Sprintf("mem_threshold:%s", agentInfo.Host_Name)
 	cpuKey := fmt.Sprintf("cpu_threshold:%s", agentInfo.Host_Name)
-	err = redis.Rdb.Set(context.Background(), memKey, agentInfo.MemThreshold, 0).Err()
+	err = redis.Rdb.Set(context.Background(), memKey, memThreshold, 0).Err()
 	if err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store memory threshold in Redis"})
 		return
 	}
-	err = redis.Rdb.Set(context.Background(), cpuKey, agentInfo.CPUThreshold, 0).Err()
+	err = redis.Rdb.Set(context.Background(), cpuKey, cpuThreshold, 0).Err()
 	if err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store CPU threshold in Redis"})
