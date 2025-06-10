@@ -76,7 +76,7 @@ func InstallAgent(c *gin.Context) {
 
 	// 如果 host_name 已存在，返回错误并停止安装
 	if exist {
-		tx.Commit()//  提交事务
+		tx.Commit() //  提交事务
 		c.IndentedJSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("host_name '%s' already exists", agentInfo.Host_Name)})
 		return
 	}
@@ -99,7 +99,7 @@ func InstallAgent(c *gin.Context) {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to get company_id"})
 		return
 	}
-	
+
 	// 插入 host_info 表
 	var hostInfo model.HostInfo
 	hostInfo.Hostname = agentInfo.Host_Name
@@ -110,7 +110,7 @@ func InstallAgent(c *gin.Context) {
 	hostInfo.Token = agentInfo.Token
 	hostInfo.CreatedAt = time.Now()
 	hostInfo.CompanyID = company_id
-	err = model.InsertHostInfo(hostInfo, username)
+	err = model.InsertHostInfoTx(tx, hostInfo, username)
 	if err != nil {
 		tx.Rollback()
 		s := fmt.Sprintf("Failed to insert host info: %s", err)
@@ -119,7 +119,7 @@ func InstallAgent(c *gin.Context) {
 	}
 
 	// 存储host_name和token到数据库
-	err = model.InsertHostandToken(agentInfo.Host_Name, agentInfo.Token)
+	err = model.InsertHostandTokenTx(tx, agentInfo.Host_Name, agentInfo.Token)
 	if err != nil {
 		tx.Rollback()
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to insert host info into database"})
@@ -157,9 +157,9 @@ func InstallAgent(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit database changes"})
 		return
 	}
-		
+
 	// 安装成功，返回成功信息
-	 c.IndentedJSON(http.StatusOK, gin.H{"message": "Agent installed successfully", "host_name": agentInfo.Host_Name, "token": agentInfo.Token})
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Agent installed successfully", "host_name": agentInfo.Host_Name, "token": agentInfo.Token})
 }
 
 // 随机生成指定长度的随机token

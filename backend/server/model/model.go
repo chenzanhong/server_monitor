@@ -148,7 +148,55 @@ func InsertHostInfo(hostInfo HostInfo, username string) error {
         INSERT INTO host_info (host_name, ip, os, platform, kernel_arch, created_at, user_name,company_id)
         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6, $7)
         RETURNING id, host_name`
-		err = DB.QueryRow(insertSQL, hostInfo.Hostname, hostInfo.IP, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch, username,hostInfo.CompanyID).Scan(&hostInfoID, &hostname)
+		err = DB.QueryRow(insertSQL, hostInfo.Hostname, hostInfo.IP, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch, username, hostInfo.CompanyID).Scan(&hostInfoID, &hostname)
+		if err != nil {
+			fmt.Printf("Failed to insert host_info: %v\n", err)
+			return err
+		}
+		fmt.Printf("Inserted new host_info with ID and Name: %d and %v\n", hostInfoID, hostname)
+	}
+
+	return nil
+}
+
+func InsertHostInfoTx(tx *sql.Tx, hostInfo HostInfo, username string) error {
+	var hostInfoID int
+	var hostname string
+	var exists bool
+
+	// 检查主机记录是否存在
+	querySQL := `
+    SELECT id, host_name, EXISTS (SELECT 1 FROM host_info WHERE host_name = $1 AND os = $2 AND platform = $3 AND kernel_arch = $4)
+    FROM host_info WHERE host_name = $1 AND os = $2 AND platform = $3 AND kernel_arch = $4`
+
+	err := tx.QueryRow(querySQL, hostInfo.Hostname, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch).Scan(&hostInfoID, &hostname, &exists)
+	if err == sql.ErrNoRows {
+		fmt.Println("No matching host info found.")
+		exists = false
+	} else if err != nil {
+		fmt.Printf("Failed to query host info: %v\n", err)
+		return err
+	}
+
+	if exists {
+		// 更新已存在的主机记录
+		updateSQL := `
+        UPDATE host_info
+        SET created_at = CURRENT_TIMESTAMP
+        WHERE id = $1`
+		_, err = tx.Exec(updateSQL, hostInfoID)
+		if err != nil {
+			fmt.Printf("Failed to update host_info_created_at: %v\n", err)
+			return err
+		}
+		fmt.Printf("Updated existing host_info with ID: %d\n", hostInfoID)
+	} else {
+		// 插入新的主机记录
+		insertSQL := `
+        INSERT INTO host_info (host_name, ip, os, platform, kernel_arch, created_at, user_name,company_id)
+        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6, $7)
+        RETURNING id, host_name`
+		err = tx.QueryRow(insertSQL, hostInfo.Hostname, hostInfo.IP, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch, username, hostInfo.CompanyID).Scan(&hostInfoID, &hostname)
 		if err != nil {
 			fmt.Printf("Failed to insert host_info: %v\n", err)
 			return err
@@ -283,6 +331,52 @@ func InsertHostandToken(hostname string, Token string) error {
 	VALUES ($1, $2) RETURNING token`
 	var token string
 	err = DB.QueryRow(insertSQL, hostname, Token).Scan(&token)
+	if err != nil {
+		log.Fatalf("Failed to query host info: %v\n", err)
+		return err
+	}
+	log.Println("Insert successfully")
+
+	return nil
+}
+
+func InsertHostandTokenTx(tx *sql.Tx, hostname string, Token string) error {
+	var existingID int
+	// 查询是否存在
+	querySQL := `
+	SELECT id
+	FROM hostandtoken
+	WHERE host_name = $1`
+
+	err := tx.QueryRow(querySQL, hostname).Scan(&existingID)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("failed to query hostandtoken: %v", err)
+	}
+	if existingID > 0 {
+		// 更新已存在的主机记录
+		updateSQL := `
+        UPDATE hostandtoken                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+		SET 
+		    token = $1,
+		    last_heartbeat = CURRENT_TIMESTAMP
+		WHERE host_name = $2`
+		_, err = tx.Exec(updateSQL, Token, hostname)
+		if err != nil {
+			fmt.Printf("Failed to update hostandtoken's token: %v\n", err)
+			return err
+		}
+		fmt.Printf("Updated existing hostandtoken with token: %d\n", Token)
+		//fmt.Println("InsertHostandToken : The host_name already exists!")
+		return nil
+	}
+
+	// 插入新的记录
+	fmt.Println("Inserting new host")
+	insertSQL := `
+	INSERT INTO hostandtoken (host_name, token)
+	VALUES ($1, $2) RETURNING token`
+	var token string
+	err = tx.QueryRow(insertSQL, hostname, Token).Scan(&token)
 	if err != nil {
 		log.Fatalf("Failed to query host info: %v\n", err)
 		return err
