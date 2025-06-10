@@ -3,6 +3,7 @@ package install
 import (
 	gs "backend/server/handle/agent/getscript"
 	"backend/server/model"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -10,20 +11,24 @@ import (
 	"net/http"
 	"time"
 
+	"backend/server/redis"
+
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/ssh"
 )
 
 type SshInfo struct {
-	Host       string `json:"host"`
-	User       string `json:"user"`
-	Password   string `json:"password"`
-	Port       int    `json:"port"`
-	Host_Name  string `json:"host_name"`
-	OS         string `json:"os"`
-	Platform   string `json:"platform"`
-	KernelArch string `json:"kernel_arch"`
-	Token      string `json:"token"`
+	Host         string  `json:"host"`
+	User         string  `json:"user"`
+	Password     string  `json:"password"`
+	Port         int     `json:"port"`
+	Host_Name    string  `json:"host_name"`
+	OS           string  `json:"os"`
+	Platform     string  `json:"platform"`
+	KernelArch   string  `json:"kernel_arch"`
+	CPUThreshold float64 `json:"cputhreshold"`
+	MemThreshold float64 `json:"memthreshold"`
+	Token        string  `json:"token"`
 }
 
 // InstallAgent 安装agent
@@ -108,6 +113,8 @@ func InstallAgent(c *gin.Context) {
 	hostInfo.Platform = agentInfo.Platform
 	hostInfo.KernelArch = agentInfo.KernelArch
 	hostInfo.Token = agentInfo.Token
+	hostInfo.CPUThreshold = agentInfo.CPUThreshold
+	hostInfo.MemThreshold = agentInfo.MemThreshold
 	hostInfo.CreatedAt = time.Now()
 	hostInfo.CompanyID = company_id
 	err = model.InsertHostInfoTx(tx, hostInfo, username)
@@ -115,6 +122,22 @@ func InstallAgent(c *gin.Context) {
 		tx.Rollback()
 		s := fmt.Sprintf("Failed to insert host info: %s", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": s})
+		return
+	}
+
+	// 将阈值存入 Redis
+	memKey := fmt.Sprintf("mem_threshold:%s", agentInfo.Host_Name)
+	cpuKey := fmt.Sprintf("cpu_threshold:%s", agentInfo.Host_Name)
+	err = redis.Rdb.Set(context.Background(), memKey, agentInfo.MemThreshold, 0).Err()
+	if err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store memory threshold in Redis"})
+		return
+	}
+	err = redis.Rdb.Set(context.Background(), cpuKey, agentInfo.CPUThreshold, 0).Err()
+	if err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store CPU threshold in Redis"})
 		return
 	}
 

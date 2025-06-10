@@ -80,6 +80,34 @@ func GetLatestSystemInfo(c *gin.Context) {
 		return
 	}
 
+	// 从 Redis 读取阈值
+	memKey := fmt.Sprintf("mem_threshold:%s", hostname)
+	cpuKey := fmt.Sprintf("cpu_threshold:%s", hostname)
+	memThreshold, err := redis.Rdb.Get(ctx, memKey).Float64()
+	if err != nil {
+		log.Printf("%s获取内存阈值失败: %s", logs.GetLogPrefix(2), err)
+	}
+	cpuThreshold, err := redis.Rdb.Get(ctx, cpuKey).Float64()
+	if err != nil {
+		log.Printf("%s获取 CPU 阈值失败: %s", logs.GetLogPrefix(2), err)
+	}
+	AlertMessages := ""
+	// 比较阈值并设置告警信息
+	if requestData.MemInfo.UserPercent > memThreshold {
+		AlertMessages = "内存告警"
+	}
+	for _, data := range requestData.CPUInfo {
+		if data.Percent > cpuThreshold {
+			AlertMessages = "CPU告警"
+			if requestData.MemInfo.UserPercent > memThreshold {
+				AlertMessages = "CPU与内存告警"
+			}
+		}
+	}
+
 	// 返回结果
-	c.JSON(http.StatusOK, requestData)
+	c.JSON(http.StatusOK, gin.H{
+		"data":           requestData,
+		"alert_messages": AlertMessages,
+	})
 }
