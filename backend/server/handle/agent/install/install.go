@@ -206,5 +206,4 @@ sudo systemctl start main_startup.service
 	case <-time.After(30 * time.Second):
 		return nil
 	}
-	return nil
 }

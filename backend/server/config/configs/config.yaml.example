@@ -31,3 +31,9 @@ email:
 smtp_server:
   SMTPServer_host: smtp.163.com
   SMTPServer_port: 25
+
+redis:
+    host: 120.79.200.209
+    port: "6379"
+    password: ""
+    db: "0"

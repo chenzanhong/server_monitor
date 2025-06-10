@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"backend/server/model"
 	"backend/server/redis"
 	"context"
 	"encoding/json"
@@ -56,7 +57,14 @@ func GetLatestSystemInfo(c *gin.Context) {
 
 	// 获取最新数据
 	if latestKey == "" {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No data found in Redis"})
+		// 如果 Redis 中没有数据，则从数据库中查询最后一条系统信息
+		lastSystemInfo, err := model.ReadLastSystemInfo(hostname)
+		if err != nil {
+			log.Printf("从数据库查询最后一条系统信息失败: %v", err)
+			c.JSON(http.StatusNotFound, gin.H{"error": "No data found in Redis and Database"})
+			return
+		}
+		c.JSON(http.StatusOK, lastSystemInfo)
 		return
 	}
 
