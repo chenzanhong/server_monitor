@@ -1,6 +1,7 @@
 package init
 
 import (
+	cf "backend/server/config"
 	u "backend/server/model/user"
 	"bufio"
 	"context"
@@ -44,7 +45,7 @@ CREATE TABLE IF NOT EXISTS users (
     is_verified BOOLEAN DEFAULT FALSE,
     role_id INT REFERENCES roles(id) DEFAULT 0,
     company_id INT DEFAULT 0,
-	token TEXT,
+	token TEXT, -- 存储更新密码时使用的唯一凭证，用于验证用户身份与验证码是否匹配
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -65,6 +66,7 @@ CREATE TABLE IF NOT EXISTS host_info (
 	id SERIAL PRIMARY KEY,
     user_name VARCHAR, -- REFERENCES users(name),
 	host_name VARCHAR(255)  UNIQUE,
+	ip VARCHAR(255)  UNIQUE,
 	company_id INT, -- REFERENCES company(id),
 	os TEXT NOT NULL,
 	platform TEXT NOT NULL,
@@ -101,6 +103,15 @@ CREATE TABLE IF NOT EXISTS ssh_keys (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ssh_port表，用于生成配置反向ssh的脚本
+CREATE TABLE IF NOT EXISTS ssh_ports (
+	id SERIAL PRIMARY KEY,
+    port INT,
+    is_used BOOLEAN NOT NULL DEFAULT FALSE,
+    assigned_to TEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- notice 表
 CREATE TABLE IF NOT EXISTS notices (
     id SERIAL PRIMARY KEY,
@@ -126,28 +137,6 @@ CREATE INDEX IF NOT EXISTS idx_hostandtoken_host_name ON hostandtoken(host_name)
 -- 如果经常按last_heartbeat查询或排序，可以在此字段上创建索引
 CREATE INDEX IF NOT EXISTS idx_hostandtoken_last_heartbeat ON hostandtoken(last_heartbeat);
 `
-
-// cpu_info示例，每次一新的数据就追加进json里面，这样可以保存多个时间戳的数据
-// [
-//   {
-//     "data": [
-//       {
-//         "id": 0,
-//         "percent": 25.5,
-//         "cores_num": 6,
-//         "model_name": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
-//       },
-//       {
-//         "id": 0,
-//         "percent": 25.5,
-//         "cores_num": 6,
-//         "model_name": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
-//       }
-//     ],
-//     "time": "2025-03-11T13:13:30Z"
-//   },
-//   ……
-// ]
 
 // 创建system的超级表
 const systemSuperTable = `
@@ -272,14 +261,14 @@ func InitDB() error {
 	}
 
 	//初始化TDengine数据库
-	if TDengineDB == nil {
-		return fmt.Errorf("TDengine database connection is not initialized") // 检查数据库连接是否已初始化
-	}
+	// if TDengineDB == nil {
+	// 	return fmt.Errorf("TDengine database connection is not initialized") // 检查数据库连接是否已初始化
+	// }
 
 	// 创建超级表
-	if _, err := TDengineDB.Exec(systemSuperTable); err != nil {
-		return err
-	}
+	// if _, err := TDengineDB.Exec(systemSuperTable); err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
@@ -375,6 +364,13 @@ func InitDBData() error {
 	}
 	fmt.Println("7---------------")
 
+	// 插入端口池数据
+	if err := initPortPool(tx); err != nil {
+		tx.Rollback()
+		return err
+	}
+	fmt.Println("8---------------")
+
 	if err := tx.Commit().Error; err != nil {
 		return err // 返回提交事务时的错误
 	}
@@ -417,6 +413,11 @@ func insertRoles(tx *gorm.DB) error {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
+		// 检查是否以 "//" 开头
+		if strings.HasPrefix(line, "//") {
+			fmt.Println("Encountered a comment line, exiting the loop.")
+			break // 退出循环
+		}
 		parts := strings.Split(line, ",")
 		if len(parts) < 3 {
 			return fmt.Errorf("invalid line format: %s", line)
@@ -490,12 +491,13 @@ func insertHostInfo(tx *gorm.DB) error {
 
 		userName := parts[0]
 		hostname := parts[1]
-		companyId := parts[2]
-		os := parts[3]
-		platform := parts[4]
-		kernelArch := parts[5]
+		ip := parts[2]
+		companyId := parts[3]
+		os := parts[4]
+		platform := parts[5]
+		kernelArch := parts[6]
 
-		if err := tx.Exec("INSERT INTO host_info (user_name, host_name, company_id, os, platform, kernel_arch) VALUES (?, ?, ?, ?, ?, ?)", userName, hostname, companyId, os, platform, kernelArch).Error; err != nil {
+		if err := tx.Exec("INSERT INTO host_info (user_name, host_name, ip, company_id, os, platform, kernel_arch) VALUES (?, ?, ?, ?, ?, ?, ?)", userName, hostname, ip, companyId, os, platform, kernelArch).Error; err != nil {
 			return fmt.Errorf("failed to insert host_info for %s: %w", hostname, err)
 		}
 	}
@@ -733,44 +735,16 @@ func insertNotices(tx *gorm.DB) error {
 	return scanner.Err()
 }
 
-// -- cpu表
-// CREATE TABLE IF NOT EXISTS cpu_info (
-// 	id SERIAL PRIMARY KEY,
-// 	host_id INT REFERENCES host_info(id),
-// 	model_name TEXT NOT NULL,
-// 	cores_num INT NOT NULL,
-// 	percent NUMERIC(5,2) NOT NULL,
-// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// );
-
-// -- memory 表
-// CREATE TABLE IF NOT EXISTS memory_info (
-// 	id SERIAL PRIMARY KEY,
-// 	host_id INT REFERENCES host_info(id),
-// 	total NUMERIC(10,2) NOT NULL,
-// 	available NUMERIC(10,2) NOT NULL,
-// 	used NUMERIC(10,2) NOT NULL,
-// 	free NUMERIC(10,2) NOT NULL,
-// 	user_percent NUMERIC(5,2) NOT NULL,
-// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// );
-
-// -- process 表
-// CREATE TABLE IF NOT EXISTS process_info (
-// 	id SERIAL PRIMARY KEY,
-// 	host_id INT REFERENCES host_info(id),
-// 	pid INT NOT NULL,
-// 	cpu_percent NUMERIC(5,2) NOT NULL,
-// 	mem_percent NUMERIC(5,2) NOT NULL,
-// 	cmdline TEXT NOT NULL,
-// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// );
-
-// -- net_info表
-// CREATE TABLE IF NOT EXISTS network_info (
-// 	id SERIAL PRIMARY KEY,
-// 	host_id INT REFERENCES host_info(id),
-// 	bytesrecv BIGINT NOT NULL,
-// 	bytessent BIGINT NOT NULL,
-// 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-//);
+// insertPortPool 函数从 portpool.txt 文件中读取端口池数据
+func initPortPool(tx *gorm.DB) error {
+	startPort := cf.StartPort
+	endPort := cf.EndPort
+	time := time.Now()
+	for port := startPort; port <= endPort; port++ {
+		err := tx.Create(&u.SSHPort{Port: port, UpdatedAt: time}).Error
+		if err != nil {
+			return fmt.Errorf("failed to insert port %d: %w", port, err)
+		}
+	}
+	return nil
+}

@@ -1,7 +1,9 @@
 package monitor
 
 import (
-	"backend/server/model"
+	"backend/server/logs"
+	m_init "backend/server/model/init"
+	u "backend/server/model/user"
 	"log"
 	"net/http"
 	"time"
@@ -38,42 +40,32 @@ func ListAgent(c *gin.Context) {
 
 	fromTime, err := time.Parse(time.RFC3339, from)
 	if err != nil {
+		log.Println(logs.GetLogPrefix(2) + "无效的 from 时间格式")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 from 时间格式"})
 		return
 	}
 	toTime, err := time.Parse(time.RFC3339, to)
 	if err != nil {
+		log.Println(logs.GetLogPrefix(2) + "无效的 to 时间格式")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 to 时间格式"})
 		return
 	}
 
-	// 查询数据库，过滤出当前用户的主机
-	query := `
-		SELECT id, host_name, os, platform, kernel_arch, created_at
-		FROM host_info
-		WHERE user_name = $1 AND created_at BETWEEN $2 AND $3
-	`
+	// 使用 GORM 查询
+	var hosts []u.HostInfo
+	result := m_init.DB.Table("host_info").
+		Where("user_name = ? AND created_at BETWEEN ? AND ?", username, fromTime, toTime).
+		Order("created_at DESC"). // 可选排序
+		Find(&hosts)
 
-	rows, err := model.DB.Query(query, username, fromTime, toTime)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query host_info", "details": err.Error()})
-		return
-	}
-	defer rows.Close()
-
-	var hosts []model.HostInfo
-	for rows.Next() {
-		var host model.HostInfo
-		if err := rows.Scan(&host.ID, &host.Hostname, &host.OS, &host.Platform, &host.KernelArch, &host.CreatedAt); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan host_info", "details": err.Error()})
-			return
-		}
-		hosts = append(hosts, host)
-	}
-	if err := rows.Err(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error occurred during iteration", "details": err.Error()})
+	if result.Error != nil {
+		log.Println(logs.GetLogPrefix(2)+"Failed to query host_info; details:", result.Error.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to query host_info",
+			"details": result.Error.Error(),
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, hosts)
+	c.JSON(http.StatusOK, gin.H{"hosts": hosts})
 }

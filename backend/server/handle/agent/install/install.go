@@ -1,6 +1,7 @@
 package install
 
 import (
+	gs "backend/server/handle/agent/getscript"
 	"backend/server/model"
 	"crypto/rand"
 	"encoding/hex"
@@ -38,9 +39,27 @@ func InstallAgent(c *gin.Context) {
 		return
 	}
 	username := Username.(string)
+
+	// 启动事务
+	tx, err := model.DB.Begin()
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to begin transaction"})
+		return
+	}
+
+	// 使用 defer 语句来处理事务的提交或回滚
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			log.Printf("InstallAgent: recovered from panic: %v, transaction rolled back", r)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
+	}()
+
 	// 解析json body 到结构体 SshInfo
 	var agentInfo SshInfo
 	if err := c.BindJSON(&agentInfo); err != nil {
+		tx.Rollback()
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -48,14 +67,16 @@ func InstallAgent(c *gin.Context) {
 	// 检查数据库中是否存在相同的 host_name
 	var exist bool
 	query := `SELECT EXISTS (SELECT 1 FROM host_info WHERE host_name = $1)`
-	err := model.DB.QueryRow(query, agentInfo.Host_Name).Scan(&exist)
+	err = tx.QueryRow(query, agentInfo.Host_Name).Scan(&exist)
 	if err != nil {
+		tx.Rollback()
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to check host_name in database"})
 		return
 	}
 
 	// 如果 host_name 已存在，返回错误并停止安装
 	if exist {
+		tx.Commit() //  提交事务
 		c.IndentedJSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("host_name '%s' already exists", agentInfo.Host_Name)})
 		return
 	}
@@ -63,41 +84,82 @@ func InstallAgent(c *gin.Context) {
 	// 生成16位随机token
 	token, err := generateToken(16)
 	if err != nil {
+		tx.Rollback()
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
 	agentInfo.Token = token
+
+	//查找company_id
+	var company_id int
+	query = `SELECT company_id FROM users  WHERE name = $1`
+	err = tx.QueryRow(query, username).Scan(&company_id)
+	if err != nil {
+		tx.Rollback()
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to get company_id"})
+		return
+	}
+
 	// 插入 host_info 表
 	var hostInfo model.HostInfo
 	hostInfo.Hostname = agentInfo.Host_Name
+	hostInfo.IP = agentInfo.Host
 	hostInfo.OS = agentInfo.OS
 	hostInfo.Platform = agentInfo.Platform
 	hostInfo.KernelArch = agentInfo.KernelArch
 	hostInfo.Token = agentInfo.Token
 	hostInfo.CreatedAt = time.Now()
-	err = model.InsertHostInfo(hostInfo, username)
+	hostInfo.CompanyID = company_id
+	err = model.InsertHostInfoTx(tx, hostInfo, username)
 	if err != nil {
+		tx.Rollback()
 		s := fmt.Sprintf("Failed to insert host info: %s", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": s})
 		return
 	}
 
 	// 存储host_name和token到数据库
-	err = model.InsertHostandToken(agentInfo.Host_Name, agentInfo.Token)
+	err = model.InsertHostandTokenTx(tx, agentInfo.Host_Name, agentInfo.Token)
 	if err != nil {
+		tx.Rollback()
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to insert host info into database"})
 		return
 	}
 
-	// 安装agent
-	err = DoInstallAgent(agentInfo)
+	// 改为在前端向用户展示下载、安装、执行代理的步骤，后端只负责数据库操作
+	// // 安装agent
+	// err = DoInstallAgent(agentInfo)
+	// if err != nil {
+	// 	c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	// 	return
+	// }
+
+	scriptBytes, err := gs.GenerateAgentScriptBytes(agentInfo.Host, agentInfo.Token)
 	if err != nil {
-		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		tx.Rollback()
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	// 设置响应头
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=install_agent.sh"))
+
+	// 返回脚本文件
+	if _, err := c.Writer.Write(scriptBytes); err != nil { // 注意检查 Write 的错误
+		tx.Rollback()
+		log.Printf("InstallAgent: 写入响应体错误: %v", err)
+	}
+
+	// 提交事务
+	if err := tx.Commit(); err != nil {
+		log.Printf("InstallAgent: failed to commit transaction: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit database changes"})
 		return
 	}
 
 	// 安装成功，返回成功信息
-	c.IndentedJSON(http.StatusOK, gin.H{"message": "Agent installed successfully", "host_name": agentInfo.Host_Name, "token": agentInfo.Token})
+	// c.IndentedJSON(http.StatusOK, gin.H{"message": "Agent installed successfully", "host_name": agentInfo.Host_Name, "token": agentInfo.Token})
 }
 
 // 随机生成指定长度的随机token

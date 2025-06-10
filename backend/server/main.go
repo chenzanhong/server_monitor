@@ -3,16 +3,24 @@ package main
 import (
 	"backend/server/config"
 	"backend/server/handle/admin"
+	"backend/server/handle/agent/getscript"
 	"backend/server/handle/agent/install"
+	pt "backend/server/handle/agent/port"
 	"backend/server/handle/company"
+	e "backend/server/handle/email"
 	"backend/server/handle/server/monitor" // 引入 monitor 包
+	"backend/server/handle/transfer"
+	g "backend/server/handle/transfer/global"
+	trans "backend/server/handle/transfer/trans-init"
 	"backend/server/handle/user/info"
 	"backend/server/handle/user/login"
 	"backend/server/handle/user/update"
+	"backend/server/logs"
 	"backend/server/middlewire"
 	"backend/server/middlewire/cors"
 	db "backend/server/model/init"
 	"backend/server/redis"
+	"time"
 
 	"log"
 	"os"
@@ -39,6 +47,9 @@ func main() {
 	//	}
 	//	os.Exit(0)
 	//}()
+
+	logs.InitZapSugarDefault()
+
 	//读取DBConfig.yaml文件
 	config, err := config.LoadConfig()
 	if err != nil {
@@ -86,9 +97,9 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	//连接TDengine数据库
-	if err := db.ConnectTDengine(); err != nil {
-		log.Fatalf("Failed to connect to TDengine database: %v", err)
-	}
+	// if err := db.ConnectTDengine(); err != nil {
+	// 	log.Fatalf("Failed to connect to TDengine database: %v", err)
+	// }
 
 	// 初始化数据库
 	if err := db.InitDB(); err != nil {
@@ -100,13 +111,21 @@ func main() {
 		log.Fatalf("Failed to initialize data: %v", err)
 	}
 	//初始化TDengine
-	if err := db.InitTDengine(); err != nil {
-		log.Fatalf("Failed to initialize TDengine: %v", err)
-	}
+	// if err := db.InitTDengine(); err != nil {
+	// 	log.Fatalf("Failed to initialize TDengine: %v", err)
+	// }
 	// 初始化redis
 	// if err := db.InitRedis(); err!= nil {
 	// 	log.Fatalf("Failed to connect to redis: %v", err)
 	// }
+	// 初始化SSH连接池及文件传输服务
+	g.Pool = trans.NewSSHConnectionPool(10, 10*time.Minute)
+	stopChan := make(chan struct{})
+	defer close(stopChan)
+	go g.Pool.Cleanup(stopChan)          // 启动清理协程
+	trans.NewFileTransferService(g.Pool) // 初始化文件传输服务
+	g.FTS = trans.NewFileTransferService(g.Pool)
+
 	go monitor.CheckServerStatus()
 	router.Static("/static", "./static")
 
@@ -115,6 +134,8 @@ func main() {
 
 	router.POST("/agent/register", login.Register)
 	router.POST("/agent/login", login.Login)
+	router.GET("/defaultagentscript", getscript.GetAgentScript) // 获取安装代理程序的脚本
+
 	// 需要 JWT 认证的路由
 	auth := router.Group("/agent", middlewire.JWTAuthMiddleware())
 	{
@@ -144,7 +165,25 @@ func main() {
 		auth.GET("/list", monitor.ListAgent)
 		auth.GET("/monitor/:hostname", monitor.GetAgentInfo)
 		auth.GET("/monitor/status/:hostname", monitor.GetLatestSystemInfo)
+
+		// 脚本
+		auth.GET("/agentscript", getscript.GetAgentScript)       // 获取安装代理程序的脚本
+		auth.GET("/sshscript", getscript.GetSSHScript)           // 获取配置反向ssh的脚本
+		auth.GET("/combinedscript", getscript.GetCombinedScript) // 获取合并后的脚本——包含安装代理程序和配置反向SSH隧道
+		auth.GET("/port/get", pt.GetAvailablePort)               // 获取用于生成ssh脚本所需要的端口port
+
+		// 文件传输
+		auth.POST("/upload", transfer.CommonUpload)
+		auth.POST("/download", transfer.CommonDownload)
+		auth.POST("/transfer", transfer.TransferBetweenTwoServers)
+
+		// 邮件
+		auth.POST("/sendemail", e.SendEmailHandler)
+
+		// 日志
+		auth.POST("/getuseroperationlogs", logs.GetUserOperationLogs) // 获取用户操作日志，支持按时间段、操作类型、按用户名筛选
 	}
+
 	router.POST("/agent/addSystem_info", monitor.ReceiveAndStoreSystemMetrics)
 	router.Run("0.0.0.0:8080")
 }

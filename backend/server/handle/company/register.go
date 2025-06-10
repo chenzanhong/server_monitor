@@ -1,6 +1,7 @@
 package company
 
 import (
+	"backend/server/logs"
 	m_init "backend/server/model/init"
 	u "backend/server/model/user"
 	"errors"
@@ -39,6 +40,7 @@ func Register(c *gin.Context) {
 
 	// 解析JSON数据
 	if err := c.BindJSON(&input); err != nil {
+		log.Println(logs.GetLogPrefix(2) + "数据库查询公司失败")
 		c.JSON(http.StatusBadRequest, gin.H{"message": "请求数据格式错误"})
 		return
 	}
@@ -46,9 +48,11 @@ func Register(c *gin.Context) {
 	//检查公司名是否已经存在
 	var company u.Company
 	if err := m_init.DB.Where("name = ?", input.Company).First(&company).Error; err == nil {
+		log.Println(logs.GetLogPrefix(2) + "公司名已存在")
 		c.JSON(http.StatusBadRequest, gin.H{"message": "公司名已存在"})
 		return
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Println(logs.GetLogPrefix(2) + "数据库查询公司失败")
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询公司失败"})
 		return
 	}
@@ -60,9 +64,11 @@ func Register(c *gin.Context) {
 	//}
 	//检测公司统一社会信用代码是否已经存在
 	if err := m_init.DB.Where("social_credit_code = ?", input.Social_Credit_Code).First(&company).Error; err == nil {
+		log.Println(logs.GetLogPrefix(2) + "公司统一社会信用代码已存在")
 		c.JSON(http.StatusBadRequest, gin.H{"message": "公司统一社会信用代码已存在"})
 		return
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Println(logs.GetLogPrefix(2) + "数据库查询公司失败")
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询公司失败"})
 		return
 	}
@@ -71,6 +77,7 @@ func Register(c *gin.Context) {
 	var admin u.User
 	if err := m_init.DB.Where("name = ?", username).First(&admin).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Println(logs.GetLogPrefix(2) + "用户信息不存在")
 			c.JSON(http.StatusBadRequest, gin.H{"message": "用户信息不存在"})
 			return
 		}
@@ -78,14 +85,17 @@ func Register(c *gin.Context) {
 		return
 	}
 	if admin.Realname == "" {
+		log.Println(logs.GetLogPrefix(2) + "管理员需要实名,请在个人信息中实名")
 		c.JSON(http.StatusBadRequest, gin.H{"message": "管理员需要实名,请在个人信息中实名"})
 		return
 	}
 	if admin.Realname != input.Admin_Name {
+		log.Println(logs.GetLogPrefix(2) + "管理员实名信息不匹配")
 		c.JSON(http.StatusBadRequest, gin.H{"message": "管理员实名信息不匹配"})
 		return
 	}
 	if admin.Email != input.Admin_Email {
+		log.Println(logs.GetLogPrefix(2) + "管理员邮箱不匹配")
 		c.JSON(http.StatusBadRequest, gin.H{"message": "管理员邮箱不匹配"})
 		return
 	}
@@ -99,13 +109,14 @@ func Register(c *gin.Context) {
 	createAt := time.Now().Format(layout)
 
 	notice := u.Notice{
-		Content: content,
-		Send:    username,
-		Receive: "root",
-		State:   "unprocessed",
+		Content:  content,
+		Send:     username,
+		Receive:  "root",
+		State:    "unprocessed",
 		CreateAt: createAt,
 	}
 	if err := m_init.DB.Create(&notice).Error; err != nil {
+		log.Println(logs.GetLogPrefix(2) + "数据库插入申请失败")
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库插入申请失败"})
 		return
 	}

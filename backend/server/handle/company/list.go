@@ -1,7 +1,9 @@
 package company
 
 import (
+	"backend/server/logs"
 	m_init "backend/server/model/init"
+	"log"
 	"net/http"
 
 	admin "backend/server/handle/admin"
@@ -25,11 +27,13 @@ func GetCompanyList(c *gin.Context) {
 	username, _ := c.Get("username")
 
 	if !admin.IsRoot(username.(string)) { // 系统管理员
+		log.Println(logs.GetLogPrefix(2) + "非系统管理员，权限不足")
 		c.JSON(http.StatusForbidden, gin.H{"message": "非系统管理员，权限不足"})
 		return
 	}
 	var companies []u.Company
 	if err := m_init.DB.Find(&companies).Error; err != nil {
+		log.Println(logs.GetLogPrefix(2) + "数据库查询公司失败")
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询公司失败"})
 		return
 	}

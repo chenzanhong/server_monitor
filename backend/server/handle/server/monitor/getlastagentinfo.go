@@ -1,21 +1,22 @@
 package monitor
 
 import (
-	"backend/server/model"
+	"backend/server/logs"
 	"backend/server/redis"
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
 func GetLatestSystemInfo(c *gin.Context) {
 	hostname := c.Param("hostname")
 	if len(hostname) == 0 {
-		log.Printf("名字出错！")
+		log.Printf("%s名字出错！", logs.GetLogPrefix(2))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "主机名不能为空"})
 		return
 	}
@@ -29,7 +30,7 @@ func GetLatestSystemInfo(c *gin.Context) {
 	for {
 		keys, nextCursor, err := redis.Rdb.Scan(ctx, cursor, fmt.Sprintf("system_info:%s:*", hostname), 100).Result()
 		if err != nil {
-			log.Printf("Error scanning keys: %v\n", err)
+			log.Printf("%sError scanning keys: %v\n", logs.GetLogPrefix(2), err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan keys"})
 			return
 		}
@@ -39,7 +40,7 @@ func GetLatestSystemInfo(c *gin.Context) {
 			timestampStr := key[len(fmt.Sprintf("system_info:%s:", hostname)):]
 			timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
 			if err != nil {
-				log.Printf("Error parsing timestamp from key %s: %v\n", key, err)
+				log.Printf("%sError parsing timestamp from key %s: %v\n", logs.GetLogPrefix(2), key, err)
 				continue
 			}
 			if timestamp > latestTimestamp {
@@ -57,21 +58,15 @@ func GetLatestSystemInfo(c *gin.Context) {
 
 	// 获取最新数据
 	if latestKey == "" {
-		// 如果 Redis 中没有数据，则从数据库中查询最后一条系统信息
-		lastSystemInfo, err := model.ReadLastSystemInfo(hostname)
-		if err != nil {
-			log.Printf("从数据库查询最后一条系统信息失败: %v", err)
-			c.JSON(http.StatusNotFound, gin.H{"error": "No data found in Redis and Database"})
-			return
-		}
-		c.JSON(http.StatusOK, lastSystemInfo)
+		log.Printf("%sNo data found in Redis", logs.GetLogPrefix(2))
+		c.JSON(http.StatusNotFound, gin.H{"error": "No data found in Redis"})
 		return
 	}
 
 	// 从 Redis 获取 JSON 字符串
 	jsonData, err := redis.Rdb.Get(ctx, latestKey).Result()
 	if err != nil {
-		log.Printf("获取 Redis 数据失败: %s", err)
+		log.Printf("%s获取 Redis 数据失败: %s", logs.GetLogPrefix(2), err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取数据失败"})
 		return
 	}
@@ -80,7 +75,7 @@ func GetLatestSystemInfo(c *gin.Context) {
 	var requestData RequestData
 	err = json.Unmarshal([]byte(jsonData), &requestData)
 	if err != nil {
-		log.Printf("解析 JSON 数据失败: %s", err)
+		log.Printf("%s解析 JSON 数据失败: %s", logs.GetLogPrefix(2), err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "解析数据失败"})
 		return
 	}

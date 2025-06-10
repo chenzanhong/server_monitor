@@ -6,15 +6,12 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"strings"
 	"time"
 
+	e "backend/server/handle/email"
 	m_init "backend/server/model/init"
 	u "backend/server/model/user"
-	"os"
-	"strconv"
 
-	"gopkg.in/gomail.v2"
 	"gorm.io/gorm"
 
 	"github.com/gin-gonic/gin"
@@ -37,7 +34,7 @@ func UpdateUserInfo(c *gin.Context) {
 
 	// 解析请求体	前端可只传递要修改的字段
 	var request struct {
-		NewName     string `json:"new_name"`
+		// NewName     string `json:"new_name"`
 		NewPassword string `json:"new_password"`
 		Email       string `json:"new_email"`
 		RealName    string `json:"realname"`
@@ -48,25 +45,32 @@ func UpdateUserInfo(c *gin.Context) {
 	}
 
 	// 检查新用户名是否已存在
-	if request.NewName != "" {
-		var existingUser u.User
-		if err := m_init.DB.Where("name = ?", request.NewName).First(&existingUser).Error; err == nil {
-			c.JSON(http.StatusConflict, gin.H{"message": "更新用户名错误：新用户名已存在", "error": err.Error()})
-			return
-		} else if err == gorm.ErrRecordNotFound {
-			// 用户名不存在，执行更新操作
-			if err := m_init.DB.Model(&u.User{}).Where("name =?", username).Updates(map[string]interface{}{"name": request.NewName}).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"message": "更新用户名失败", "error": err.Error()})
-				return
-			}
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询失败"})
-			return
-		}
+	// if request.NewName != "" {
+	// 	var existingUser u.User
+	// 	if err := m_init.DB.Where("name = ?", request.NewName).First(&existingUser).Error; err == nil {
+	// 		c.JSON(http.StatusConflict, gin.H{"message": "更新用户名错误：新用户名已存在", "error": err.Error()})
+	// 		return
+	// 	} else if err == gorm.ErrRecordNotFound {
+	// 		// 用户名不存在，执行更新操作
+	// 		if err := m_init.DB.Model(&u.User{}).Where("name =?", username).Updates(map[string]interface{}{"name": request.NewName}).Error; err != nil {
+	// 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新用户名失败", "error": err.Error()})
+	// 			return
+	// 		}
+	// 	} else {
+	// 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询失败"})
+	// 		return
+	// 	}
+	// }
+
+	// 获取当前用户信息
+	var user u.User
+	if err := m_init.DB.Where("name =?", username).First(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "获取用户信息失败", "error": err.Error()})
+		return
 	}
 
 	// 检查新密码是否为空
-	if request.NewPassword != "" {
+	if request.NewPassword != "" && request.NewPassword != user.Password {
 		// 执行密码更新操作
 		if err := m_init.DB.Model(&u.User{}).Where("name =?", username).Updates(map[string]interface{}{"password": request.NewPassword}).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新密码失败", "error": err.Error()})
@@ -75,15 +79,16 @@ func UpdateUserInfo(c *gin.Context) {
 	}
 
 	// 检查新邮箱是否为空
-	if request.Email != "" {
+	if request.Email != "" && request.Email != user.Email {
 		// 执行邮箱更新操作
 		if err := m_init.DB.Model(&u.User{}).Where("name =?", username).Updates(map[string]interface{}{"email": request.Email}).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新邮箱失败", "error": err.Error()})
+			return
 		}
 	}
 
 	// 检查是否传入真实姓名
-	if request.RealName != "" {
+	if request.RealName != "" && request.RealName != user.Realname {
 		// 执行真实姓名更新操作
 		if err := m_init.DB.Model(&u.User{}).Where("name =?", username).Updates(map[string]interface{}{"realname": request.RealName}).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新真实姓名失败", "error": err.Error()})
@@ -144,7 +149,11 @@ func RequestResetPassword(c *gin.Context) {
 	}
 
 	// 发送重置密码邮件
-	sendResetPasswordEmail(request.Email, token)
+	err = e.SendResetPasswordEmail(request.Email, token)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "发送重置密码邮件失败"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "重置密码请求成功",
@@ -196,45 +205,51 @@ func ResetPassword(c *gin.Context) {
 }
 
 // 方式一 发送token
-func sendResetPasswordEmail(email, token string) {
-	myEmail := os.Getenv("EMAIL_NAME")
-	myPassword := os.Getenv("EMAIL_PASSWORD")
-	baseUrl := os.Getenv("BASE_URL")
-	smtpServerHost := os.Getenv("SMTP_SERVER_HOST")
-	smtpServerPortStr := os.Getenv("SMTP_SERVER_PORT")
+// func sendResetPasswordEmail(email, token string) error {
+// 	myEmail := os.Getenv("EMAIL_NAME")
+// 	myPassword := os.Getenv("EMAIL_PASSWORD")
+// 	baseUrl := os.Getenv("BASE_URL")
+// 	smtpServerHost := os.Getenv("SMTP_SERVER_HOST")
+// 	smtpServerPortStr := os.Getenv("SMTP_SERVER_PORT")
 
-	if myEmail == "" || myPassword == "" || baseUrl == "" || smtpServerHost == "" || smtpServerPortStr == "" {
-		log.Fatalf("环境变量未正确设置")
-	}
+// 	if myEmail == "" || myPassword == "" || smtpServerHost == "" || smtpServerPortStr == "" {
+// 		log.Fatalf("环境变量未正确设置")
+// 		return errors.New("环境变量未正确设置")
+// 	}
 
-	smtpServerPort, err := strconv.Atoi(smtpServerPortStr)
-	if err != nil {
-		log.Fatalf("将端口号转换为整数时出错: %v", err)
-	}
+// 	smtpServerPort, err := strconv.Atoi(smtpServerPortStr)
+// 	if err != nil {
+// 		log.Fatalf("将端口号转换为整数时出错: %v", err)
+// 		return err
+// 	}
 
-	log.Printf("Email: %s, Password: %s, SMTP Server: %s, Port: %d, BaseUrl: %s", myEmail, myPassword, smtpServerHost, smtpServerPort, baseUrl)
+// 	log.Printf("Email: %s, Password: %s, SMTP Server: %s, Port: %d, BaseUrl: %s", myEmail, myPassword, smtpServerHost, smtpServerPort, baseUrl)
 
-	m := gomail.NewMessage()
-	m.SetHeader("From", myEmail)
-	m.SetHeader("To", email)
-	m.SetHeader("Subject", "Password Reset Request")
-	m.SetBody("text/html", fmt.Sprintf(`
-		<h1>密码找回</h1>
-		<p>这是你的验证码：%s</p>
-	`, token))
+// 	m := gomail.NewMessage()
+// 	m.SetHeader("From", myEmail)
+// 	m.SetHeader("To", email)
+// 	m.SetHeader("Subject", "Password Reset Request")
+// 	m.SetBody("text/html", fmt.Sprintf(`
+// 		<h1>密码找回</h1>
+// 		<p>这是你的验证码：%s</p>
+// 	`, token))
 
-	d := gomail.NewDialer(smtpServerHost, smtpServerPort, myEmail, myPassword)
-	if err := d.DialAndSend(m); err != nil {
-		log.Printf("发送邮件失败: %v", err)
-		if strings.Contains(err.Error(), "535") { // 例如，检查错误消息中是否包含 SMTP 身份验证失败的代码
-			log.Printf("可能是 SMTP 身份验证错误")
-		} else if strings.Contains(err.Error(), "connection refused") {
-			log.Printf("SMTP 服务器连接被拒绝")
-		}
-	} else {
-		log.Println("邮件发送成功")
-	}
-}
+// 	d := gomail.NewDialer(smtpServerHost, smtpServerPort, myEmail, myPassword)
+// 	d.TLSConfig = &tls.Config{InsecureSkipVerify: true} // 跳过证书验证，生产环境中应谨慎使用
+// 	if err := d.DialAndSend(m); err != nil {
+// 		log.Printf("发送邮件失败: %v", err)
+// 		if strings.Contains(err.Error(), "535") { // 例如，检查错误消息中是否包含 SMTP 身份验证失败的代码
+// 			log.Printf("可能是 SMTP 身份验证错误")
+// 			return errors.New("发送邮件失败可能是 SMTP 身份验证错误")
+// 		} else if strings.Contains(err.Error(), "connection refused") {
+// 			log.Printf("SMTP 服务器连接被拒绝")
+// 			return errors.New("发送邮件失败：SMTP 服务器连接被拒绝")
+// 		}
+// 	} else {
+// 		log.Println("邮件发送成功")
+// 	}
+// 	return nil
+// }
 
 // 发送链接
 // func sendResetPasswordEmail(email, token string) {
