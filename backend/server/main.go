@@ -5,6 +5,7 @@ import (
 	"backend/server/handle/admin"
 	"backend/server/handle/agent/getscript"
 	"backend/server/handle/agent/install"
+	"backend/server/handle/agent/threshold"
 	pt "backend/server/handle/agent/port"
 	"backend/server/handle/company"
 	e "backend/server/handle/email"
@@ -158,7 +159,7 @@ func main() {
 		auth.GET("/get-company-list", company.GetCompanyList) // 公司列表
 		auth.POST("/sshkey", admin.AddSShkey)                 // 添加SSH密钥
 		auth.POST("/joincompany", admin.JoinCompany)          // 邀请成员加入公司
-		auth.POST("/replaceadmin", admin.ReplaceAdmin)        // 更换管理员
+		auth.POST("/replaceadmin", admin.ReplaceAdmin)        // 更换管 3理员
 
 		// 监控
 		auth.POST("/install", install.InstallAgent)
@@ -182,6 +183,9 @@ func main() {
 
 		// 日志
 		auth.POST("/getuseroperationlogs", logs.GetUserOperationLogs) // 获取用户操作日志，支持按时间段、操作类型、按用户名筛选
+
+		// 预警
+		auth.POST("/setthreshold", threshold.UpdateThreshold) // 设置阈值
 	}
 
 	router.POST("/agent/addSystem_info", monitor.ReceiveAndStoreSystemMetrics)

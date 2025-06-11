@@ -64,16 +64,18 @@ type Claims struct {
 
 // HostInfo 结构体对应 host_info 数据库表
 type HostInfo struct {
-	ID         int       `json:"id"`        // 添加 ID 字段
-	UserName   string    `json:"user_name"` // 新增字段对应 user_name
-	Hostname   string    `json:"host_name"` // 原名 host_name
-	IP         string    `json:"ip"`
-	OS         string    `json:"os"`
-	Platform   string    `json:"platform"`
-	KernelArch string    `json:"kernel_arch"`
-	CreatedAt  time.Time `json:"host_info_created_at"` // 对应 created_at
-	Token      string    `json:"token"`
-	CompanyID  int       `json:"company_id,omitempty"` // 新增字段对应 company_id
+	ID           int       `json:"id"`        // 添加 ID 字段
+	UserName     string    `json:"user_name"` // 新增字段对应 user_name
+	Hostname     string    `json:"host_name"` // 原名 host_name
+	IP           string    `json:"ip"`
+	OS           string    `json:"os"`
+	Platform     string    `json:"platform"`
+	KernelArch   string    `json:"kernel_arch"`
+	CreatedAt    time.Time `json:"host_info_created_at"` // 对应 created_at
+	Token        string    `json:"token"`
+	CPUThreshold float64   `json:"cpu_threshold"`
+	MemThreshold float64   `json:"mem_threshold"`
+	CompanyID    int       `json:"company_id,omitempty"` // 新增字段对应 company_id
 }
 
 type CPUInfo struct {
@@ -675,6 +677,106 @@ func ReadNetInfo(hostname string, from, to string, result map[string]interface{}
 	result["net"] = netData
 	return nil
 }
+
+// ReadLastSystemInfo 查询指定主机的系统信息最后一条数据
+func ReadLastSystemInfo(hostname string) (map[string]interface{}, error) {
+	result := make(map[string]interface{})
+
+	// 构造 TDengine 查询语句，获取最后一条记录
+	tableName := fmt.Sprintf("%s_system_info", hostname)
+	querySQL := fmt.Sprintf(`
+        SELECT host_info, cpu_info, memory_info, network_info 
+        FROM %s 
+        ORDER BY created_at DESC 
+        LIMIT 1`, tableName)
+
+	rows, err := TDengine.Query(querySQL)
+	if err != nil {
+		return nil, fmt.Errorf("查询系统信息时发生错误: %v", err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, fmt.Errorf("未找到指定主机的系统信息")
+	}
+
+	var (
+		hostInfoJSON []byte
+		cpuInfoJSON  []byte
+		memInfoJSON  []byte
+		networkJSON  []byte
+	)
+
+	if err := rows.Scan(&hostInfoJSON, &cpuInfoJSON, &memInfoJSON, &networkJSON); err != nil {
+		return nil, fmt.Errorf("扫描记录时发生错误: %v", err)
+	}
+
+	// 解析 host_info 字段
+	var hostInfo HostInfo
+	if err := json.Unmarshal(hostInfoJSON, &hostInfo); err != nil {
+		return nil, fmt.Errorf("解析主机信息失败: %v", err)
+	}
+	result["host"] = map[string]interface{}{
+		"id":                   hostInfo.ID,
+		"host_name":            hostInfo.Hostname,
+		"os":                   hostInfo.OS,
+		"platform":             hostInfo.Platform,
+		"kernel_arch":          hostInfo.KernelArch,
+		"host_info_created_at": hostInfo.CreatedAt,
+	}
+
+	// 解析 cpu_info 字段
+	var cpuDataObj []CPUInfo
+	if err := json.Unmarshal(cpuInfoJSON, &cpuDataObj); err != nil {
+		return nil, fmt.Errorf("解析 CPU 信息失败: %v", err)
+	}
+	var cpuData []map[string]interface{}
+	for _, cpu := range cpuDataObj {
+		cpuData = append(cpuData, map[string]interface{}{
+			"id":                  cpu.ID,
+			"cores_num":           cpu.CoresNum,
+			"model_name":          cpu.ModelName,
+			"percent":             cpu.Percent,
+			"cpu_info_created_at": cpu.CreatedAt,
+		})
+	}
+	result["cpu"] = cpuData
+
+	// 解析 memory_info 字段
+	var memInfo MemoryInfo
+	if err := json.Unmarshal(memInfoJSON, &memInfo); err != nil {
+		return nil, fmt.Errorf("解析内存信息失败: %v", err)
+	}
+	result["memory"] = map[string]interface{}{
+		"id":                  memInfo.ID,
+		"total":               memInfo.Total,
+		"available":           memInfo.Available,
+		"used":                memInfo.Used,
+		"free":                memInfo.Free,
+		"user_percent":        memInfo.UserPercent,
+		"mem_info_created_at": memInfo.CreatedAt,
+	}
+
+	// 解析 network_info 字段
+	var netDataObj []NetworkInfo
+	if err := json.Unmarshal(networkJSON, &netDataObj); err != nil {
+		return nil, fmt.Errorf("解析网络信息失败: %v", err)
+	}
+	var netData []map[string]interface{}
+	for _, net := range netDataObj {
+		netData = append(netData, map[string]interface{}{
+			"id":                  net.ID,
+			"name":                net.Name,
+			"bytes_sent":          net.BytesSent,
+			"bytes_recv":          net.BytesRecv,
+			"net_info_created_at": net.CreatedAt,
+		})
+	}
+	result["net"] = netData
+
+	return result, nil
+}
+
 func ReadDB(queryType, from, to string, hostname string) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 

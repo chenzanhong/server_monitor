@@ -52,12 +52,14 @@ type HostInfo struct {
     ID         int    `json:"id" gorm:"column:id"`
     UserName   string `json:"user_name" gorm:"column:user_name"`
     Hostname   string `json:"host_name" gorm:"column:host_name"` 
+    CompanyID  int    `json:"company_id,omitempty" gorm:"column:company_id"`
     IP         string `json:"ip" gorm:"column:ip"`
     OS         string `json:"os" gorm:"column:os"`
     Platform   string `json:"platform" gorm:"column:platform"`
     KernelArch string `json:"kernel_arch" gorm:"column:kernel_arch"`
+	CPUThreshold float64 `json:"cpu_threshold" gorm:"column:cpu_threshold"`
+	MemThreshold float64 `json:"mem_threshold" gorm:"column:mem_threshold"`
     CreatedAt  string `json:"host_info_created_at" gorm:"column:created_at"`
-    CompanyID  int    `json:"company_id,omitempty" gorm:"column:company_id"`
 }
 
 // TableName 指定表名

@@ -78,8 +78,19 @@ func cleanupAndPersistData(ctx context.Context) {
 }
 
 // 模拟将数据存入数据库的函数
+// 替换clear.go中模拟的saveToDatabase函数
 func saveToDatabase(data model.RequestData) error {
-	// 这里实现将数据存入数据库的逻辑
-	fmt.Printf("Saving data for host %s to database\n", data.HostInfo.Hostname)
+	hostname := data.HostInfo.Hostname
+	err := model.InsertSystemInfo(
+		hostname,
+		data.HostInfo,
+		data.CPUInfo,
+		data.MemInfo,
+		data.NetInfo,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to save data to database: %w", err)
+	}
+	log.Println("Data saved to database")
 	return nil
 }
