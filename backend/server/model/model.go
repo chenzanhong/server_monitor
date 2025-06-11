@@ -73,8 +73,8 @@ type HostInfo struct {
 	KernelArch   string    `json:"kernel_arch"`
 	CreatedAt    time.Time `json:"host_info_created_at"` // 对应 created_at
 	Token        string    `json:"token"`
-	CPUThreshold float64   `json:"cputhreshold"`
-	MemThreshold float64   `json:"memthreshold"`
+	CPUThreshold float64   `json:"cpu_threshold"`
+	MemThreshold float64   `json:"mem_threshold"`
 	CompanyID    int       `json:"company_id,omitempty"` // 新增字段对应 company_id
 }
 

@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
 
 	"backend/server/redis"
@@ -28,8 +26,8 @@ type SshInfo struct {
 	OS           string `json:"os"`
 	Platform     string `json:"platform"`
 	KernelArch   string `json:"kernel_arch"`
-	CPUThreshold string `json:"cputhreshold"`
-	MemThreshold string `json:"memthreshold"`
+	CPUThreshold float64    `json:"cpu_threshold"`
+	MemThreshold float64    `json:"mem_threshold"`
 	Token        string `json:"token"`
 }
 
@@ -117,22 +115,22 @@ func InstallAgent(c *gin.Context) {
 	hostInfo.Token = agentInfo.Token
 
 	// 将阈值字符串转换为 float64
-	cpuThresholdStr := agentInfo.CPUThreshold
-	memThresholdStr := agentInfo.MemThreshold
-	cpuThreshold, err := strconv.ParseFloat(strings.TrimSuffix(cpuThresholdStr, "%"), 64)
-	if err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid CPU threshold format"})
-		return
-	}
-	memThreshold, err := strconv.ParseFloat(strings.TrimSuffix(memThresholdStr, "%"), 64)
-	if err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid memory threshold format"})
-		return
-	}
-	cpuThreshold = cpuThreshold / 100.0
-	memThreshold = memThreshold / 100.0
+	// cpuThresholdStr := agentInfo.CPUThreshold
+	// memThresholdStr := agentInfo.MemThreshold
+	// cpuThreshold, err := strconv.ParseFloat(strings.TrimSuffix(cpuThresholdStr, "%"), 64)
+	// if err != nil {
+	// 	tx.Rollback()
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid CPU threshold format"})
+	// 	return
+	// }
+	// memThreshold, err := strconv.ParseFloat(strings.TrimSuffix(memThresholdStr, "%"), 64)
+	// if err != nil {
+	// 	tx.Rollback()
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid memory threshold format"})
+	// 	return
+	// }
+	cpuThreshold := agentInfo.CPUThreshold / 100.0
+	memThreshold := agentInfo.MemThreshold / 100.0
 
 	hostInfo.CPUThreshold = cpuThreshold
 	hostInfo.MemThreshold = memThreshold

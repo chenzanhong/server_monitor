@@ -71,6 +71,8 @@ CREATE TABLE IF NOT EXISTS host_info (
 	os TEXT NOT NULL,
 	platform TEXT NOT NULL,
 	kernel_arch TEXT NOT NULL,
+	cpu_threshold FLOAT DEFAULT 0.9,
+	mem_threshold FLOAT DEFAULT 0.9,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- TIMESTAMP WITH TIME ZONE 加上时区
 );
 

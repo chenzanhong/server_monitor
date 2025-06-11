@@ -5,6 +5,7 @@ import (
 	"backend/server/handle/admin"
 	"backend/server/handle/agent/getscript"
 	"backend/server/handle/agent/install"
+	"backend/server/handle/agent/threshold"
 	pt "backend/server/handle/agent/port"
 	"backend/server/handle/company"
 	e "backend/server/handle/email"
@@ -182,6 +183,9 @@ func main() {
 
 		// 日志
 		auth.POST("/getuseroperationlogs", logs.GetUserOperationLogs) // 获取用户操作日志，支持按时间段、操作类型、按用户名筛选
+
+		// 预警
+		auth.POST("/setthreshold", threshold.UpdateThreshold) // 设置阈值
 	}
 
 	router.POST("/agent/addSystem_info", monitor.ReceiveAndStoreSystemMetrics)
