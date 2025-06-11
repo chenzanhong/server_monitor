@@ -68,6 +68,7 @@ type HostInfo struct {
 	UserName     string    `json:"user_name"` // 新增字段对应 user_name
 	Hostname     string    `json:"host_name"` // 原名 host_name
 	IP           string    `json:"ip"`
+	Port         int       `json:"port"`
 	OS           string    `json:"os"`
 	Platform     string    `json:"platform"`
 	KernelArch   string    `json:"kernel_arch"`
@@ -120,7 +121,7 @@ func InsertHostInfo(hostInfo HostInfo, username string) error {
 
 	// 检查主机记录是否存在
 	querySQL := `
-    SELECT id, host_name, EXISTS (SELECT 1 FROM host_info WHERE host_name = $1 AND os = $2 AND platform = $3 AND kernel_arch = $4)
+    SELECT id, host_name, EXISTS (SELECT 1 FROM host_info WHERE host_name = $1 AND os = $2 AND platform = $3 AND kernel_arch = $4 )
     FROM host_info WHERE host_name = $1 AND os = $2 AND platform = $3 AND kernel_arch = $4`
 
 	err := DB.QueryRow(querySQL, hostInfo.Hostname, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch).Scan(&hostInfoID, &hostname, &exists)
@@ -147,10 +148,10 @@ func InsertHostInfo(hostInfo HostInfo, username string) error {
 	} else {
 		// 插入新的主机记录
 		insertSQL := `
-        INSERT INTO host_info (host_name, ip, os, platform, kernel_arch, created_at, user_name,company_id)
-        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6, $7)
+        INSERT INTO host_info (host_name, ip, os, platform, kernel_arch, created_at, user_name,company_id,port)
+        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6, $7,$8)
         RETURNING id, host_name`
-		err = DB.QueryRow(insertSQL, hostInfo.Hostname, hostInfo.IP, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch, username, hostInfo.CompanyID).Scan(&hostInfoID, &hostname)
+		err = DB.QueryRow(insertSQL, hostInfo.Hostname, hostInfo.IP, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch, username, hostInfo.CompanyID, hostInfo.Port).Scan(&hostInfoID, &hostname)
 		if err != nil {
 			fmt.Printf("Failed to insert host_info: %v\n", err)
 			return err

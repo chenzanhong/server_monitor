@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS host_info (
     user_name VARCHAR, -- REFERENCES users(name),
 	host_name VARCHAR(255)  UNIQUE,
 	ip VARCHAR(255)  UNIQUE,
+	port INT DEFAULT 22,
 	company_id INT, -- REFERENCES company(id),
 	os TEXT NOT NULL,
 	platform TEXT NOT NULL,
