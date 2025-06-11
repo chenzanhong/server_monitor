@@ -1,7 +1,9 @@
 package monitor
 
 import (
+	"backend/server/handle/email"
 	"backend/server/logs"
+	model "backend/server/model/init"
 	"backend/server/redis"
 	"context"
 	"encoding/json"
@@ -9,11 +11,21 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 func GetLatestSystemInfo(c *gin.Context) {
+	Username, exists := c.Get("username")
+	if !exists {
+		log.Printf("未找到用户信息")
+		c.JSON(401, gin.H{
+			"message": "未找到用户信息",
+		})
+		return
+	}
+	username := Username.(string)
 	hostname := c.Param("hostname")
 	if len(hostname) == 0 {
 		log.Printf("%s名字出错！", logs.GetLogPrefix(2))
@@ -91,17 +103,69 @@ func GetLatestSystemInfo(c *gin.Context) {
 	if err != nil {
 		log.Printf("%s获取 CPU 阈值失败: %s", logs.GetLogPrefix(2), err)
 	}
+
+	warningType := ""
 	AlertMessages := ""
-	// 比较阈值并设置告警信息
+
+	// 判断类型
+	cpuAlert := false
+	memAlert := false
 	if requestData.MemInfo.UserPercent > memThreshold {
-		AlertMessages = "内存告警"
+		memAlert = true
 	}
 	for _, data := range requestData.CPUInfo {
 		if data.Percent > cpuThreshold {
-			AlertMessages = "CPU告警"
-			if requestData.MemInfo.UserPercent > memThreshold {
-				AlertMessages = "CPU与内存告警"
+			cpuAlert = true
+			break
+		}
+	}
+	if cpuAlert && memAlert {
+		warningType = "CPU与内存"
+		AlertMessages = "CPU与内存告警"
+	} else if cpuAlert {
+		warningType = "CPU"
+		AlertMessages = "CPU告警"
+	} else if memAlert {
+		warningType = "内存"
+		AlertMessages = "内存告警"
+	}
+
+	// 如果有告警信息，存储到数据库并发送邮件通知
+	if warningType != "" {
+		// 查询用户邮箱
+		var userEmail string
+		err = model.DB.Raw("SELECT email FROM users WHERE name = ?", username).Scan(&userEmail).Error
+		if err != nil {
+			log.Printf("%s查询用户邮箱失败: %s", logs.GetLogPrefix(2), err)
+		} else if userEmail != "" {
+			// 发送邮件通知
+			subject := fmt.Sprintf("系统告警通知 - %s", hostname)
+			message := fmt.Sprintf(`
+				<h2>系统告警通知</h2>
+				<p>主机名: %s</p>
+				<p>告警类型: %s</p>
+				<p>CPU使用率: %.2f%%</p>
+				<p>内存使用率: %.2f%%</p>
+				<p>时间: %s</p>
+			`, hostname, AlertMessages, requestData.CPUInfo[0].Percent, requestData.MemInfo.UserPercent, time.Now().Format("2006-01-02 15:04:05"))
+
+			err = email.SendEmail(userEmail, subject, message)
+			if err != nil {
+				log.Printf("%s发送邮件通知失败: %s", logs.GetLogPrefix(2), err)
 			}
+		}
+
+		// 存储告警信息到数据库
+		alertContent := fmt.Sprintf("主机 %s 发生 %s，CPU使用率: %.2f%%，内存使用率: %.2f%%",
+			hostname, AlertMessages, requestData.CPUInfo[0].Percent, requestData.MemInfo.UserPercent)
+
+		err = model.DB.Exec(`
+			INSERT INTO warnings (host_name, warning_type, warning_title, warning_time)
+			VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+			hostname, warningType, alertContent).Error
+
+		if err != nil {
+			log.Printf("%s存储告警信息失败: %s", logs.GetLogPrefix(2), err)
 		}
 	}
 
