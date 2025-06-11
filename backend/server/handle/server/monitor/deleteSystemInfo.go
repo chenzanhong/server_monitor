@@ -63,6 +63,10 @@ func DeleteSystemInfo(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "删除hostandtoken的数据失败"})
 			return
 		}
+	}else{
+		log.Println("数据库没有相应的hostandtoken数据")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "数据库没有相应的hostandtoken数据"})
+		return
 	}
 
 	//检查在host_info表是否存在对应的数据
@@ -88,9 +92,15 @@ func DeleteSystemInfo(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "删除host_info数据失败"})
 			return
 		}
+	}else{
+		log.Println("数据库没有相应的host_info数据")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "数据库没有相应的host_info数据"})
+		return
 	}
 
 	//grpc部分
+
+	//成功响应
 	c.JSON(http.StatusOK, gin.H{
 		"message": "采集器删除成功",
 	})
