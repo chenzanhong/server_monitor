@@ -161,7 +161,7 @@ func InstallAgent(c *gin.Context) {
 	// 	return
 	// }
 
-	scriptBytes, err := gs.GenerateAgentScriptBytes(agentInfo.Host, agentInfo.Token)
+	scriptBytes, err := gs.GenerateAgentScriptBytes(agentInfo.Host_Name, agentInfo.Token)
 	if err != nil {
 		tx.Rollback()
 		c.AbortWithError(http.StatusInternalServerError, err)

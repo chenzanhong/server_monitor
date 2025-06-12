@@ -19,7 +19,8 @@ type WarningRecord struct {
 
 // GetWarningRecordsByHostname 获取指定 hostname 的所有告警记录
 func GetWarningRecordsByHostname(c *gin.Context) {
-	hostname := c.Query("hostname")
+
+	hostname := c.Param("hostname")
 	if hostname == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "hostname 参数不能为空",
