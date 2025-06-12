@@ -191,9 +191,9 @@ func GetLatestSystemInfo(c *gin.Context) {
 			hostname, AlertMessages, requestData.CPUInfo[0].Percent, requestData.MemInfo.UserPercent)
 
 		err = model.DB.Exec(`
-			INSERT INTO warnings (host_name, warning_type, warning_title, warning_time)
-			VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
-			hostname, warningType, alertContent).Error
+			INSERT INTO warnings (host_name, username, warning_type, warning_title, warning_time)
+			VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+			hostname, username, warningType, alertContent).Error
 
 		if err != nil {
 			log.Printf("%s存储告警信息失败: %s", logs.GetLogPrefix(2), err)
