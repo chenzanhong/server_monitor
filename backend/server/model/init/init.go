@@ -125,7 +125,14 @@ CREATE TABLE IF NOT EXISTS notices (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-
+-- warning 表
+CREATE TABLE IF NOT EXISTS warnings (
+    id SERIAL PRIMARY KEY,
+	host_name VARCHAR(255) ,
+    warning_type VARCHAR NOT NULL,
+	warning_title VARCHAR NOT NULL,
+	warning_time TIMESTAMP DEFAULT NOW()
+);
 -- 在system_info表的host_info_id字段上创建索引，加速通过主机ID查找系统信息
 -- CREATE INDEX IF NOT EXISTS idx_system_info_host_info_id ON system_info(host_info_id);
 
@@ -373,6 +380,13 @@ func InitDBData() error {
 		return err
 	}
 	fmt.Println("8---------------")
+
+	//插入warning数据
+	if err := insertWarning(tx); err != nil {
+		tx.Rollback()
+		return err
+	}
+	fmt.Println("9---------------")
 
 	if err := tx.Commit().Error; err != nil {
 		return err // 返回提交事务时的错误
@@ -750,4 +764,41 @@ func initPortPool(tx *gorm.DB) error {
 		}
 	}
 	return nil
+}
+
+//insertWarning  函数从 warning.txt 文件中读取警告数据
+func insertWarning(tx *gorm.DB) error { 
+	file, err := os.Open("asset/example/warning.txt")
+	if err != nil {
+		return fmt.Errorf("failed to open warning file: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// 检查是否以 "//" 开头
+		if strings.HasPrefix(line, "//") {
+			fmt.Println("Encountered a comment line, exiting the loop.")
+			break // 退出循环
+		}
+		parts := strings.Split(line, ",")
+		if len(parts) < 3 {
+			return fmt.Errorf("invalid line format: %s", line)
+		}
+
+		hostname := parts[0]
+		warning_type := parts[1]
+		warning_title := parts[2]
+		warning_time := time.Now().Format("2006-01-02 15:04:05")
+		fmt.Println(hostname)
+		fmt.Println(warning_type)
+		fmt.Println(warning_title)
+		fmt.Println(warning_time)
+
+		if err := tx.Exec("INSERT INTO warnings (host_name , warning_type, warning_title, warning_time) VALUES (?, ?, ?, ?)", hostname,warning_type,warning_title,warning_time).Error; err != nil {
+			return fmt.Errorf("failed to insert warning for %s: %w", hostname, err)
+		}
+	}
+	return scanner.Err()
 }
