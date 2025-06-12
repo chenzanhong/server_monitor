@@ -18,17 +18,17 @@ import (
 )
 
 type SshInfo struct {
-	Host         string `json:"host"`
-	User         string `json:"user"`
-	Password     string `json:"password"`
-	Port         int    `json:"port"`
-	Host_Name    string `json:"host_name"`
-	OS           string `json:"os"`
-	Platform     string `json:"platform"`
-	KernelArch   string `json:"kernel_arch"`
-	CPUThreshold float64    `json:"cpu_threshold"`
-	MemThreshold float64    `json:"mem_threshold"`
-	Token        string `json:"token"`
+	Host         string  `json:"host"`
+	User         string  `json:"user"`
+	Password     string  `json:"password"`
+	Port         int     `json:"port"`
+	Host_Name    string  `json:"host_name"`
+	OS           string  `json:"os"`
+	Platform     string  `json:"platform"`
+	KernelArch   string  `json:"kernel_arch"`
+	CPUThreshold float64 `json:"cpu_threshold"`
+	MemThreshold float64 `json:"mem_threshold"`
+	Token        string  `json:"token"`
 }
 
 // InstallAgent 安装agent
@@ -114,21 +114,6 @@ func InstallAgent(c *gin.Context) {
 	hostInfo.KernelArch = agentInfo.KernelArch
 	hostInfo.Token = agentInfo.Token
 
-	// 将阈值字符串转换为 float64
-	// cpuThresholdStr := agentInfo.CPUThreshold
-	// memThresholdStr := agentInfo.MemThreshold
-	// cpuThreshold, err := strconv.ParseFloat(strings.TrimSuffix(cpuThresholdStr, "%"), 64)
-	// if err != nil {
-	// 	tx.Rollback()
-	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid CPU threshold format"})
-	// 	return
-	// }
-	// memThreshold, err := strconv.ParseFloat(strings.TrimSuffix(memThresholdStr, "%"), 64)
-	// if err != nil {
-	// 	tx.Rollback()
-	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid memory threshold format"})
-	// 	return
-	// }
 	cpuThreshold := agentInfo.CPUThreshold / 100.0
 	memThreshold := agentInfo.MemThreshold / 100.0
 
@@ -185,12 +170,17 @@ func InstallAgent(c *gin.Context) {
 
 	// 设置响应头
 	c.Header("Content-Type", "application/octet-stream")
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=install_agent.sh"))
+	filename := "install_agent.sh"
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 
 	// 返回脚本文件
 	if _, err := c.Writer.Write(scriptBytes); err != nil { // 注意检查 Write 的错误
-		tx.Rollback()
 		log.Printf("InstallAgent: 写入响应体错误: %v", err)
+		tx.Rollback()
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to write script to response",
+		})
+		return
 	}
 
 	// 提交事务
