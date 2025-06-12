@@ -87,6 +87,7 @@ type SSHPort struct {
 type Warning struct {
 	ID           uint      `gorm:"primaryKey" json:"id"`
 	HostName     string    `json:"host_name"`
+	Username     string    `json:"username"`
 	WarningType  string    `json:"warning_type"`
 	WarningTitle string    `json:"warning_title"`
 	WarningTime  time.Time `json:"warning_time"`

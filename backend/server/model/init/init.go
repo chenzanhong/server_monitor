@@ -129,6 +129,7 @@ CREATE TABLE IF NOT EXISTS notices (
 CREATE TABLE IF NOT EXISTS warnings (
     id SERIAL PRIMARY KEY,
 	host_name VARCHAR(255) ,
+	username VARCHAR(255) ,
     warning_type VARCHAR NOT NULL,
 	warning_title VARCHAR NOT NULL,
 	warning_time TIMESTAMP DEFAULT NOW()
@@ -766,8 +767,8 @@ func initPortPool(tx *gorm.DB) error {
 	return nil
 }
 
-//insertWarning  函数从 warning.txt 文件中读取警告数据
-func insertWarning(tx *gorm.DB) error { 
+// insertWarning  函数从 warning.txt 文件中读取警告数据
+func insertWarning(tx *gorm.DB) error {
 	file, err := os.Open("asset/example/warning.txt")
 	if err != nil {
 		return fmt.Errorf("failed to open warning file: %w", err)
@@ -796,7 +797,7 @@ func insertWarning(tx *gorm.DB) error {
 		fmt.Println(warning_title)
 		fmt.Println(warning_time)
 
-		if err := tx.Exec("INSERT INTO warnings (host_name , warning_type, warning_title, warning_time) VALUES (?, ?, ?, ?)", hostname,warning_type,warning_title,warning_time).Error; err != nil {
+		if err := tx.Exec("INSERT INTO warnings (host_name , warning_type, warning_title, warning_time) VALUES (?, ?, ?, ?)", hostname, warning_type, warning_title, warning_time).Error; err != nil {
 			return fmt.Errorf("failed to insert warning for %s: %w", hostname, err)
 		}
 	}

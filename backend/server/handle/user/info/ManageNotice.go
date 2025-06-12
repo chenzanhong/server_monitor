@@ -41,6 +41,18 @@ func ManageNotice(c *gin.Context) {
 		return
 	}
 
+	if  notice.State == "processed" || notice.State == "expired" { 
+		log.Println("通知已处理或已过期")
+		c.JSON(http.StatusBadRequest, gin.H{"message": "通知已处理或已过期"})
+		return
+	}
+
+	if notice.Receive != username  { 
+		log.Println("处理的用户不是接收人")
+		c.JSON(http.StatusBadRequest, gin.H{"message": "处理的用户不是接收人"})
+		return
+	}
+
 	// mode := c.Query("mode")
 	// if mode == "" {
 	// 	c.JSON(http.StatusBadRequest, gin.H{"message": "缺少mode"})
@@ -255,7 +267,7 @@ func ManageNotice(c *gin.Context) {
 
 		//更新通知的状态
 		query = "UPDATE notices SET state = $1 WHERE id = $2"
-		err = m_init.DB.Exec(query, "已接受", notice.ID).Error
+		err = m_init.DB.Exec(query, "processed", notice.ID).Error
 		if err != nil {
 			log.Println("数据库更新通知状态失败")
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库更新通知状态失败"})
