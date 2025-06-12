@@ -14,7 +14,36 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
+
+// shouldAlert 判断指定 hostname 是否满足告警的冷却时间要求
+func ShouldAlert(hostname string) bool {
+	var latestTime time.Time
+	err := model.DB.Raw(`
+		SELECT warning_time FROM warnings 
+		WHERE host_name = ? 
+		ORDER BY warning_time DESC LIMIT 1`,
+		hostname).Scan(&latestTime).Error
+
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// 没有历史记录，可以告警
+			return true
+		} else { // 数据库查询失败
+			return false
+		}
+	}
+
+	// 获取当前时间
+	now := time.Now()
+
+	// 冷静期为10分钟
+	coolDownPeriod := 10 * time.Minute
+
+	// 返回是否已经超过冷静期
+	return now.Sub(latestTime) > coolDownPeriod
+}
 
 func GetLatestSystemInfo(c *gin.Context) {
 	Username, exists := c.Get("username")
@@ -98,10 +127,12 @@ func GetLatestSystemInfo(c *gin.Context) {
 	memThreshold, err := redis.Rdb.Get(ctx, memKey).Float64()
 	if err != nil {
 		log.Printf("%s获取内存阈值失败: %s", logs.GetLogPrefix(2), err)
+		memThreshold = 0.9 // 设置为默认值
 	}
 	cpuThreshold, err := redis.Rdb.Get(ctx, cpuKey).Float64()
 	if err != nil {
 		log.Printf("%s获取 CPU 阈值失败: %s", logs.GetLogPrefix(2), err)
+		cpuThreshold = 0.9
 	}
 
 	warningType := ""
@@ -131,7 +162,7 @@ func GetLatestSystemInfo(c *gin.Context) {
 	}
 
 	// 如果有告警信息，存储到数据库并发送邮件通知
-	if warningType != "" {
+	if warningType != "" && ShouldAlert(hostname) {
 		// 查询用户邮箱
 		var userEmail string
 		err = model.DB.Raw("SELECT email FROM users WHERE name = ?", username).Scan(&userEmail).Error
