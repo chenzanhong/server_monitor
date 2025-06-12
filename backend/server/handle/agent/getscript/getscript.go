@@ -119,7 +119,7 @@ cd agent || { echo "找不到目录 agent，请检查仓库结构"; exit 1; }
 
 # 授予执行权限并运行主程序
 chmod +x main
-# ./main -hostname="${HOSTNAME}" -token="${TOKEN}" &
+# ./main -hostname=${HOSTNAME} -token=${TOKEN} &
 
 cat > /tmp/monitor_agent.service <<EOF
 [Unit]
@@ -128,7 +128,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=$AGENT_DIR/agent/main -hostname="${HOSTNAME}" -token="${TOKEN}"
+ExecStart=$AGENT_DIR/agent/main -hostname=${HOSTNAME} -token=${TOKEN}
 Restart=always
 
 [Install]
@@ -416,7 +416,7 @@ cd agent || { echo "找不到目录 agent，请检查仓库结构"; exit 1; }
 
 # 授予执行权限并运行主程序
 chmod +x main
-# ./main -hostname="${HOSTNAME}" -token="${TOKEN}" &
+# ./main -hostname=${HOSTNAME} -token=${TOKEN} &
 
 cat > /tmp/monitor_agent.service <<EOF
 [Unit]
@@ -425,7 +425,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=$AGENT_DIR/agent/main -hostname="${HOSTNAME}" -token="${TOKEN}"
+ExecStart=$AGENT_DIR/agent/main -hostname=${HOSTNAME} -token=${TOKEN}
 Restart=always
 
 [Install]

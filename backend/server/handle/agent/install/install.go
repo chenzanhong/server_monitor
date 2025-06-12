@@ -2,7 +2,7 @@ package install
 
 import (
 	gs "backend/server/handle/agent/getscript"
-	u "backend/server/model/user"
+	"backend/server/model"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -106,7 +106,7 @@ func InstallAgent(c *gin.Context) {
 	}
 
 	// 插入 host_info 表
-	var hostInfo utils.HostInfo
+	var hostInfo model.HostInfo
 	hostInfo.Hostname = agentInfo.Host_Name
 	hostInfo.IP = agentInfo.Host
 	hostInfo.OS = agentInfo.OS
