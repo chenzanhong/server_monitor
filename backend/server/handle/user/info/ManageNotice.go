@@ -111,7 +111,7 @@ func ManageNotice(c *gin.Context) {
 		parts = strings.Split(parts[1], ",社会信用代码:")
 		social_credit_code := strings.TrimSpace(parts[0])
 		parts = strings.Split(parts[1], ",管理员邮箱:")
-		admin_email := strings.TrimSpace(parts[0])
+		// admin_email := strings.TrimSpace(parts[0])
 
 		// 根据管理员用户名获取管理员的编号
 		var admin_id int
