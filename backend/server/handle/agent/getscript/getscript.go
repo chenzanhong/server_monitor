@@ -67,14 +67,19 @@ case "$OS" in
 esac
 
 mkdir -p "$AGENT_DIR"
-cd "$AGENT_DIR"
+cd "$AGENT_DIR" || { echo "无法创建或进入目录 $AGENT_DIR"; exit 1; }
+
+pwd
 
 git clone "$GITHUB_REPO" .
-cd agent/agent || exit
+cd agent || { echo "找不到目录 agent，请检查仓库结构"; exit 1; }
+
+# 编译 main
+# go build -o main .
 
 # 授予执行权限并运行主程序
 chmod +x main
-./main -hostname="${HOSTNAME}" -token="${TOKEN}" &
+# ./main -hostname="${HOSTNAME}" -token="${TOKEN}" &
 
 cat > /tmp/monitor_agent.service <<EOF
 [Unit]
@@ -83,7 +88,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=$AGENT_DIR/agent/agent/main -hostname="${HOSTNAME}" -token="${TOKEN}"
+ExecStart=$AGENT_DIR/agent/main -hostname="${HOSTNAME}" -token="${TOKEN}"
 Restart=always
 
 [Install]
@@ -94,6 +99,7 @@ ${SUDO}  mv /tmp/monitor_agent.service /etc/systemd/system/monitor_agent.service
 ${SUDO}  systemctl daemon-reload
 ${SUDO}  systemctl enable monitor_agent.service
 ${SUDO}  systemctl start monitor_agent.service
+${SUDO}  systemctl status monitor_agent.service
 
 echo "[+] Agent 安装完成！已启动 agent 服务"
 `
@@ -167,6 +173,7 @@ sudo mv /tmp/reversetunnel@${SSH_TUNNEL_PORT}.service /etc/systemd/system/revers
 sudo systemctl daemon-reload
 sudo systemctl enable reversetunnel@${SSH_TUNNEL_PORT}
 sudo systemctl start reversetunnel@${SSH_TUNNEL_PORT}
+sudo systemctl status reversetunnel@${SSH_TUNNEL_PORT}
 
 echo "[+] 反向 SSH 隧道配置完成！已启动隧道（端口: $SSH_TUNNEL_PORT）"
 `
@@ -320,11 +327,11 @@ mkdir -p "$AGENT_DIR"
 cd "$AGENT_DIR"
 
 git clone "$GITHUB_REPO" .
-cd agent/agent || exit
+cd agent || exit
 
 # 授予执行权限并运行主程序
 chmod +x main
-./main -hostname="${HOSTNAME}" -token="${TOKEN}" &
+# ./main -hostname="${HOSTNAME}" -token="${TOKEN}" &
 
 
 cat > /tmp/monitor_agent.service <<EOF
@@ -334,7 +341,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=$AGENT_DIR/main -hostname="${HOSTNAME}" -token="${TOKEN}"
+ExecStart=$AGENT_DIR/agent/main -hostname="${HOSTNAME}" -token="${TOKEN}"
 Restart=always
 
 [Install]
@@ -345,6 +352,7 @@ sudo mv /tmp/monitor_agent.service /etc/systemd/system/monitor_agent.service
 sudo systemctl daemon-reload
 sudo systemctl enable monitor_agent.service
 sudo systemctl start monitor_agent.service
+${SUDO}  systemctl status monitor_agent.service
 
 echo "[+] Agent 安装完成！已启动 agent 服务"
 
