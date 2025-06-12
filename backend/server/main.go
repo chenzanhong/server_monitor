@@ -167,7 +167,7 @@ func main() {
 		auth.GET("/monitor/:hostname", monitor.GetAgentInfo)
 		auth.GET("/monitor/status/:hostname", monitor.GetLatestSystemInfo)
 		auth.POST("/delete", monitor.DeleteSystemInfo)
-		auth.GET("/getwarning", )
+		auth.GET("/getwarning", monitor.GetWarningRecordsByHostname)
 
 		// 脚本
 		auth.GET("/agentscript", getscript.GetAgentScript)       // 获取安装代理程序的脚本
