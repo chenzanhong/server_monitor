@@ -180,6 +180,7 @@ func ManageNotice(c *gin.Context) {
 			return
 		}
 		old_admin := strings.TrimSpace(parts[0])
+		log.Println(old_admin)
 
 		parts = strings.Split(parts[1], ",新管理员用户名:")
 		if len(parts) < 2 {
@@ -187,7 +188,13 @@ func ManageNotice(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"message": "通知内容格式错误"})
 			return
 		}
-		new_admin := strings.TrimSpace(parts[1])
+		parts = strings.Split(parts[1], ",新管理员邮箱:")
+		if len(parts) < 2 { 
+			log.Println("通知内容格式错误：缺少 ',新管理员邮箱:' 分隔符")
+			c.JSON(http.StatusBadRequest, gin.H{"message": "通知内容格式错误"})
+		}
+		new_admin := strings.TrimSpace(parts[0])
+		log.Println(new_admin)
 
 		// 获取原管理员公司编号
 		var company_id int
