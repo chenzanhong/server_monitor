@@ -2,7 +2,7 @@ package monitor
 
 import (
 	"backend/server/logs"
-	"backend/server/model"
+	// "backend/server/model"
 	"backend/server/redis"
 	"context"
 	"fmt"
@@ -23,7 +23,7 @@ func GetAgentInfo(c *gin.Context) {
 		return
 	}
 
-	queryType := c.DefaultQuery("type", "all")
+	// queryType := c.DefaultQuery("type", "all")
 	from := c.Query("from")
 	to := c.Query("to")
 
@@ -53,7 +53,7 @@ func GetAgentInfo(c *gin.Context) {
 	redisData := make([]RequestData, 0)
 	var cursor uint64
 	for {
-		keys, nextCursor, err := redis.Rdb.Scan(ctx, cursor, fmt.Sprintf("system_info:%s:*", hostname), 100).Result()
+		keys, nextCursor, err := redis.Rdb.Scan(ctx, cursor, fmt.Sprintf("system_info:%s:*", hostname), 30).Result()
 		if err != nil {
 			log.Printf("%sError scanning Redis keys: %v\n", logs.GetLogPrefix(2), err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan Redis keys"})
@@ -89,23 +89,23 @@ func GetAgentInfo(c *gin.Context) {
 		cursor = nextCursor
 	}
 
-	// 如果 Redis 中的数据覆盖了整个时间段，则直接返回
-	if len(redisData) > 0 && isTimeRangeCovered(redisData, fromTime, toTime) {
-		c.JSON(http.StatusOK, redisData)
-		return
-	}
+	// // 如果 Redis 中的数据覆盖了整个时间段，则直接返回
+	// if len(redisData) > 0 && isTimeRangeCovered(redisData, fromTime, toTime) {
+	// 	c.JSON(http.StatusOK, redisData)
+	// 	return
+	// }
 
-	// 如果 Redis 中的数据不完整，则从数据库中查询缺失的部分
-	dbData, err := model.ReadDB(queryType, from, to, hostname)
-	if err != nil {
-		log.Printf("%serror:%f", logs.GetLogPrefix(2), err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	// // 如果 Redis 中的数据不完整，则从数据库中查询缺失的部分
+	// dbData, err := model.ReadDB(queryType, from, to, hostname)
+	// if err != nil {
+	// 	log.Printf("%serror:%f", logs.GetLogPrefix(2), err)
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	// 	return
+	// }
 
 	// 合并 Redis 和数据库中的数据
-	mergedData := mergeData(redisData, dbData)
-	c.JSON(http.StatusOK, mergedData)
+	// mergedData := mergeData(redisData, dbData)
+	c.JSON(http.StatusOK, redisData)
 }
 
 // 检查 Redis 中的数据是否覆盖了整个时间段
