@@ -80,11 +80,11 @@ func JoinCompany(c *gin.Context) {
 	}
 
 	//查找要邀请人是否还在其他公司就职
-	if user.CompanyId != 0 {
-		log.Println("该用户已在其他公司就职")
-		c.JSON(http.StatusBadRequest, gin.H{"message": "该用户已在其他公司就职"})
-		return
-	}
+	//if user.CompanyId != 0 {
+	//	log.Println("该用户已在其他公司就职")
+	//	c.JSON(http.StatusBadRequest, gin.H{"message": "该用户已在其他公司就职"})
+	//	return
+	//}
 
 	//查看成员邮箱是否匹配
 	if user.Email != input.Email {
