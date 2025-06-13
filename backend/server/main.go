@@ -189,6 +189,7 @@ func main() {
 		// 预警
 		auth.POST("/setthreshold", threshold.UpdateThreshold) // 设置阈值
 	}
+	router.GET("/agentscript", getscript.GetAgentScript)       // 获取安装代理程序的脚本
 
 	router.POST("/agent/addSystem_info", monitor.ReceiveAndStoreSystemMetrics)
 	router.Run("0.0.0.0:8080")
