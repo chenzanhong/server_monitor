@@ -23,7 +23,7 @@ func GetAgentInfo(c *gin.Context) {
 		return
 	}
 
-	queryType := c.DefaultQuery("type", "all")
+	// queryType := c.DefaultQuery("type", "all")
 	from := c.Query("from")
 	to := c.Query("to")
 
