@@ -53,14 +53,14 @@ func ManageNotice(c *gin.Context) {
 		return
 	}
 
-	// 检查通知是否已经过期(通知的有效期限是10天)
+	// 检查通知是否已经过期(通知的有效期限是14天)
 	createAtTime, err := time.Parse(time.RFC3339, notice.CreateAt)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "时间格式错误"})
 		return
 	}
 
-	if time.Since(createAtTime) > 10*24*time.Hour {
+	if time.Since(createAtTime) > 14*24*time.Hour {
 		update := `UPDATE notices SET state = 'expired' WHERE id = $1`
 		_, err := model.DB.Exec(update, requestBody.ID)
 		if err != nil {
@@ -85,7 +85,7 @@ func ManageNotice(c *gin.Context) {
 	log.Printf("开始处理通知内容: %s", notice.Content)
 
 	// 处理申请注册公司的通知
-	if strings.Contains(notice.Content, "申请注册") {
+	if strings.Contains(notice.Content, "申请注册公司") {
 		// 检查是否为系统管理员
 		if role_id != 2 {
 			c.JSON(http.StatusBadRequest, gin.H{"message": "接收人不是系统管理员"})
