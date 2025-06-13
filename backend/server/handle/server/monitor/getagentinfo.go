@@ -105,7 +105,7 @@ func GetAgentInfo(c *gin.Context) {
 
 	// 合并 Redis 和数据库中的数据
 	// mergedData := mergeData(redisData, dbData)
-	c.JSON(http.StatusOK, redisData)
+	c.JSON(http.StatusOK, gin.H{"datas": redisData})
 }
 
 // 检查 Redis 中的数据是否覆盖了整个时间段
