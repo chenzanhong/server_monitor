@@ -99,6 +99,11 @@ func Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "管理员邮箱不匹配"})
 		return
 	}
+	if admin.RoleId == 1 { 
+		log.Println(logs.GetLogPrefix(2) + "已注册有公司")
+		c.JSON(http.StatusBadRequest, gin.H{"message": "已注册有公司"})
+		return
+	}
 
 	//团队申请
 	content := username + "申请注册公司:" + input.Company + "，法人:" + input.Legal_Name +
