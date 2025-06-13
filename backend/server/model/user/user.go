@@ -75,6 +75,10 @@ type HostAndToken struct {
 	Status        string `json:"status" gorm:"default 'offline'"`
 }
 
+func (HostAndToken) TableName() string {
+	return "hostandtoken" // 数据库表名对应
+}
+
 type SSHPort struct {
 	ID         int       `json:"id"`
 	Port       int       `json:"port" gorm:"column:port"`
