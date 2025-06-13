@@ -10,7 +10,7 @@ import (
 
 // GetWarningRecordsByHostname 获取指定 hostname 的所有告警记录
 func GetWarningRecordsByHostname(c *gin.Context) {
-	Username, exists := c.Get("Username")
+	Username, exists := c.Get("username")
 	if !exists {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Username not found in context",
