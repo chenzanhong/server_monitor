@@ -784,20 +784,22 @@ func insertWarning(tx *gorm.DB) error {
 			break // 退出循环
 		}
 		parts := strings.Split(line, ",")
-		if len(parts) < 3 {
+		if len(parts) < 4 {
 			return fmt.Errorf("invalid line format: %s", line)
 		}
 
 		hostname := parts[0]
-		warning_type := parts[1]
-		warning_title := parts[2]
+		username := parts[1]
+		warning_type := parts[2]
+		warning_title := parts[3]
 		warning_time := time.Now().Format("2006-01-02 15:04:05")
 		fmt.Println(hostname)
+		fmt.Println(username)
 		fmt.Println(warning_type)
 		fmt.Println(warning_title)
 		fmt.Println(warning_time)
 
-		if err := tx.Exec("INSERT INTO warnings (host_name , warning_type, warning_title, warning_time) VALUES (?, ?, ?, ?)", hostname, warning_type, warning_title, warning_time).Error; err != nil {
+		if err := tx.Exec("INSERT INTO warnings (host_name, username, warning_type, warning_title, warning_time) VALUES (?, ?, ?, ?, ?)", hostname, username, warning_type, warning_title, warning_time).Error; err != nil {
 			return fmt.Errorf("failed to insert warning for %s: %w", hostname, err)
 		}
 	}
