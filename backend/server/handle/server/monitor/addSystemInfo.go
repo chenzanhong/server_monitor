@@ -80,13 +80,24 @@ func ShouldAlert(hostname string) bool {
 	}
 
 	// 获取当前时间
-	now := time.Now()
+	var now time.Time
+	err = m_init.DB.Raw("SELECT CURRENT_TIMESTAMP").Scan(&now).Error
+	if err != nil {
+    		log.Printf("获取数据库时间失败: %v", err)
+    		return false
+	}
+	now = now.UTC()	
 
-	// 冷静期为10分钟
 	coolDownPeriod := 10 * time.Minute
+	timeDifference := now.Sub(latestTime)
+	exceedsCoolDown := timeDifference > coolDownPeriod
 
-	// 返回是否已经超过冷静期
-	return now.Sub(latestTime) > coolDownPeriod
+	fmt.Printf("最新告警时间为: %v\n", latestTime)
+	fmt.Printf("当前时间为: %v\n", now)
+	fmt.Printf("距离上次告警的时间差为: %v\n", timeDifference)
+	fmt.Printf("是否超过冷静期（%v）: %v\n", coolDownPeriod, exceedsCoolDown)
+
+	return exceedsCoolDown
 }
 
 func handleAlert(requestData RequestData) {
