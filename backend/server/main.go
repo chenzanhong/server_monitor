@@ -192,5 +192,11 @@ func main() {
 	router.GET("/agentscript", getscript.GetAgentScript)       // 获取安装代理程序的脚本
 
 	router.POST("/agent/addSystem_info", monitor.ReceiveAndStoreSystemMetrics)
+
+	err = monitor.StartWorkerPool(100, 10000) // 100个消费者，管道长度10000
+	if err != nil {
+		log.Fatalf("Failed to start worker pool: %v", err)
+	}
+
 	router.Run("0.0.0.0:8080")
 }
