@@ -92,30 +92,17 @@ func handleAlert(requestData RequestData) {
 	ctx := context.Background()
 	hostname := requestData.HostInfo.Hostname
 
-	// 查询用户名，这里直接查询单个字段而非整个结构体
-	var username string
-	err := m_init.DB.Table("host_info").Select("user_name").Where("host_name = ?", hostname).Scan(&username).Error
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			log.Printf("%s 未找到主机 %s 的信息", logs.GetLogPrefix(2), hostname)
-			return // 或者采取其他措施，比如记录错误日志后返回
-		} else {
-			log.Printf("%s 查询主机信息失败: %s", logs.GetLogPrefix(2), err)
-			return // 同样可以考虑记录错误并决定是否继续执行
-		}
-	}
-
 	// 从 Redis 读取阈值
 	memKey := fmt.Sprintf("mem_threshold:%s", hostname)
 	cpuKey := fmt.Sprintf("cpu_threshold:%s", hostname)
 	memThreshold, err := redis.Rdb.Get(ctx, memKey).Float64()
 	if err != nil {
-		log.Printf("%s 获取内存阈值失败: %s", logs.GetLogPrefix(2), err)
+		log.Printf("预警，获取内存阈值失败: %s", err)
 		memThreshold = 0.9 // 设置为默认值
 	}
 	cpuThreshold, err := redis.Rdb.Get(ctx, cpuKey).Float64()
 	if err != nil {
-		log.Printf("%s 获取 CPU 阈值失败: %s", logs.GetLogPrefix(2), err)
+		log.Printf("预警，获取 CPU 阈值失败: %s", err)
 		cpuThreshold = 0.9
 	}
 
@@ -147,11 +134,24 @@ func handleAlert(requestData RequestData) {
 
 	// 如果有告警信息，存储到数据库并发送邮件通知
 	if warningType != "" && ShouldAlert(hostname) {
+		// 查询用户名，这里直接查询单个字段而非整个结构体
+		var username string
+		err := m_init.DB.Table("host_info").Select("user_name").Where("host_name = ?", hostname).Scan(&username).Error
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				log.Printf("预警，未找到主机 %s 的信息", hostname)
+				return // 或者采取其他措施，比如记录错误日志后返回
+			} else {
+				log.Printf("预警，查询主机信息失败: %s", err)
+				return // 同样可以考虑记录错误并决定是否继续执行
+			}
+		}
+		fmt.Println("预警，用户名：", username)
 		// 查询用户邮箱
 		var userEmail string
 		err = m_init.DB.Raw("SELECT email FROM users WHERE name = ?", username).Scan(&userEmail).Error
 		if err != nil {
-			log.Printf("%s 查询用户邮箱失败: %s", logs.GetLogPrefix(2), err)
+			log.Printf("预警，查询用户邮箱失败: %s", err)
 		} else if userEmail != "" {
 			// 发送邮件通知
 			subject := fmt.Sprintf("系统告警通知 - %s", hostname)
@@ -166,10 +166,10 @@ func handleAlert(requestData RequestData) {
 
 			err = email.SendEmail(userEmail, subject, message)
 			if err != nil {
-				log.Printf("%s 发送邮件通知失败: %s", logs.GetLogPrefix(2), err)
+				log.Printf("预警，发送邮件通知失败: %s", err)
 			}
 		}
-
+		fmt.Println("预警，邮箱：", userEmail)
 		// 存储告警信息到数据库
 		alertContent := fmt.Sprintf("主机 %s 发生 %s，CPU使用率: %.2f%%，内存使用率: %.2f%%",
 			hostname, alertMessages, requestData.CPUInfo[0].Percent, requestData.MemInfo.UserPercent)
@@ -180,7 +180,7 @@ func handleAlert(requestData RequestData) {
 			hostname, username, warningType, alertContent).Error
 
 		if err != nil {
-			log.Printf("%s 存储告警信息失败: %s", logs.GetLogPrefix(2), err)
+			log.Printf("存储告警信息失败: %s",err)
 		}
 	}
 }
