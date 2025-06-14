@@ -94,7 +94,7 @@ func handleAlert(requestData RequestData) {
 
 	// 查询用户名，这里直接查询单个字段而非整个结构体
 	var username string
-	err := m_init.DB.Table("host_info").Select("username").Where("host_name = ?", hostname).Scan(&username).Error
+	err := m_init.DB.Table("host_info").Select("user_name").Where("host_name = ?", hostname).Scan(&username).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			log.Printf("%s 未找到主机 %s 的信息", logs.GetLogPrefix(2), hostname)
