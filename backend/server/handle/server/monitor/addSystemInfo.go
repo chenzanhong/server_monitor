@@ -62,31 +62,29 @@ type RequestData struct {
 // shouldAlert 判断指定 hostname 是否满足告警的冷却时间要求
 func ShouldAlert(hostname string) bool {
 	var latestTime time.Time
-	err := m_init.DB.Raw(`
-		SELECT warning_time FROM warnings 
-		WHERE host_name = ? 
-		ORDER BY warning_time DESC LIMIT 1`,
-		hostname).Scan(&latestTime).Error
+	err := m_init.DB.Raw("SELECT warning_time FROM warnings WHERE host_name = ? ORDER BY warning_time DESC LIMIT 1", hostname).Scan(&latestTime).Error
 
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			// 没有历史记录，可以告警
-			fmt.Println("没有历史记录，可以告警")
-			return true
-		} else { // 数据库查询失败
-			fmt.Println("数据库查询失败")
-			return false
-		}
-	}
-
-	// 获取当前时间
-	var now time.Time
-	err = m_init.DB.Raw("SELECT CURRENT_TIMESTAMP").Scan(&now).Error
-	if err != nil {
-    		log.Printf("获取数据库时间失败: %v", err)
+   	 	log.Printf("查询错误: %v", err)
+    		if err == gorm.ErrRecordNotFound {
+        		fmt.Println("没有历史记录，可以告警")
+        		return true
+   		}
     		return false
 	}
-	now = now.UTC()	
+
+	if latestTime == nil {
+   		 fmt.Println("warning_time 是 NULL，视为无记录")
+    		return true
+	}
+// 获取当前时间
+//	var now time.Time
+//	err = m_init.DB.Raw("SELECT CURRENT_TIMESTAMP").Scan(&now).Error
+//	if err != nil {
+//    		log.Printf("获取数据库时间失败: %v", err)
+//  		return false
+//	}
+	now := time.Now().UTC()
 
 	coolDownPeriod := 10 * time.Minute
 	timeDifference := now.Sub(latestTime)
@@ -189,8 +187,8 @@ func handleAlert(requestData RequestData) {
 
 		err = m_init.DB.Exec(`
 			INSERT INTO warnings (host_name, username, warning_type, warning_title, warning_time)
-			VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-			hostname, username, warningType, alertContent).Error
+			VALUES (?, ?, ?, ?, ?)`,
+			hostname, username, warningType, alertContent, requestData.HostInfo.CreatedAt.UTC()).Error
 
 		if err != nil {
 			log.Printf("存储告警信息失败: %s", err)
