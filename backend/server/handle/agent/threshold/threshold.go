@@ -11,7 +11,7 @@ import (
 )
 
 type ThresholdReuqest struct {
-	IP           string  `json:"ip"`
+	Hostname           string  `json:"hostname"`
 	CPUThreshold float64 `json:"cpu_threshold"`
 	MemThreshold float64 `json:"mem_threshold"`
 }
@@ -32,8 +32,8 @@ func UpdateThreshold(c *gin.Context) {
 	memThreshold := request.MemThreshold / 100.0
 
 	// 更新 Redis 中的阈值
-	memKey := "mem_threshold:" + request.IP
-	cpuKey := "cpu_threshold:" + request.IP
+	memKey := "mem_threshold:" + request.Hostname
+	cpuKey := "cpu_threshold:" + request.Hostname
 	fmt.Println(cpuThreshold," ",memThreshold)
 	ctx := context.Background()
 	if err := redis.Rdb.Set(ctx, cpuKey, cpuThreshold, 0).Err(); err != nil {
@@ -70,7 +70,7 @@ func UpdateThreshold(c *gin.Context) {
 		UPDATE host_info 
 		SET cpu_threshold = $1, mem_threshold = $2 
 		WHERE ip = $3`
-	result, err := tx.Exec(query, cpuThreshold, memThreshold, request.IP)
+	result, err := tx.Exec(query, cpuThreshold, memThreshold, request.Hostname)
 	if err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -95,7 +95,7 @@ func UpdateThreshold(c *gin.Context) {
 	// 成功响应
 	c.JSON(http.StatusOK, gin.H{
 		"message":       "Thresholds updated successfully",
-		"ip":            request.IP,
+		"ip":            request.Hostname,
 		"cpu_threshold": cpuThreshold,
 		"mem_threshold": memThreshold,
 	})
