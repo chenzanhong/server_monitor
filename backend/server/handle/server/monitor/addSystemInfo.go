@@ -71,8 +71,10 @@ func ShouldAlert(hostname string) bool {
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// 没有历史记录，可以告警
+			fmt.Println("没有历史记录，可以告警")
 			return true
 		} else { // 数据库查询失败
+			fmt.Println("数据库查询失败")
 			return false
 		}
 	}
@@ -130,7 +132,7 @@ func handleAlert(requestData RequestData) {
 		warningType = "内存"
 		alertMessages = "内存告警"
 	}
-	fmt.Println("handleAlert")
+	fmt.Println("handleAlert:", warningType)
 	// 如果有告警信息，存储到数据库并发送邮件通知
 	if warningType != "" && ShouldAlert(hostname) {
 		fmt.Println("有新预警")
