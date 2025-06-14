@@ -2,9 +2,8 @@ package monitor
 
 import (
 	"backend/server/handle/email"
-	"backend/server/logs"
-	m_init "backend/server/model/init"
 	"backend/server/model"
+	m_init "backend/server/model/init"
 	"backend/server/redis"
 	"context"
 	"encoding/json"
@@ -131,9 +130,10 @@ func handleAlert(requestData RequestData) {
 		warningType = "内存"
 		alertMessages = "内存告警"
 	}
-
+	fmt.Println("handleAlert")
 	// 如果有告警信息，存储到数据库并发送邮件通知
 	if warningType != "" && ShouldAlert(hostname) {
+		fmt.Println("有新预警")
 		// 查询用户名，这里直接查询单个字段而非整个结构体
 		var username string
 		err := m_init.DB.Table("host_info").Select("user_name").Where("host_name = ?", hostname).Scan(&username).Error
@@ -180,7 +180,7 @@ func handleAlert(requestData RequestData) {
 			hostname, username, warningType, alertContent).Error
 
 		if err != nil {
-			log.Printf("存储告警信息失败: %s",err)
+			log.Printf("存储告警信息失败: %s", err)
 		}
 	}
 }
@@ -203,7 +203,7 @@ func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 	var requestData RequestData
 	if err := c.ShouldBindJSON(&requestData); err != nil {
 		s := fmt.Sprintf("Invalid JSON data: %s", err)
-		log.Printf("%sInvalid JSON data: %s", logs.GetLogPrefix(2), err)
+		log.Printf("Invalid JSON data: %s", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": s})
 		return
 	}
@@ -214,7 +214,7 @@ func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 	key := fmt.Sprintf("system_info:%s:%d", requestData.HostInfo.Hostname, timestamp)
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
-		log.Printf("%s Failed to marshal data to JSON: %s", logs.GetLogPrefix(2), err)
+		log.Printf(" Failed to marshal data to JSON: %s", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal data to JSON"})
 		return
 	}
@@ -222,7 +222,7 @@ func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 	// 将 JSON 字符串存储到 Redis
 	err = redis.Rdb.Set(ctx, key, jsonData, 30*time.Minute).Err()
 	if err != nil {
-		log.Printf("%sFailed to insert data into Redis: %s", logs.GetLogPrefix(2), err)
+		log.Printf("Failed to insert data into Redis: %s", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to insert data into Redis"})
 		return
 	}
@@ -231,8 +231,10 @@ func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 	select {
 	case TaskQueue <- AlertTask{RequestData: requestData}:
 		// 成功入队
+		fmt.Println("成功入队")
 	default:
 		// 任务队列已满，启动单独的协程进行处理
+		fmt.Println("管道已满")
 		go handleAlert(requestData)
 	}
 
