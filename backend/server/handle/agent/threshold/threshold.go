@@ -34,7 +34,7 @@ func UpdateThreshold(c *gin.Context) {
 	// 更新 Redis 中的阈值
 	memKey := "mem_threshold:" + request.IP
 	cpuKey := "cpu_threshold:" + request.IP
-
+	fmt.Println(cpuThreshold," ",memThreshold)
 	ctx := context.Background()
 	if err := redis.Rdb.Set(ctx, cpuKey, cpuThreshold, 0).Err(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{

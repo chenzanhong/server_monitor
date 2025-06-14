@@ -65,34 +65,20 @@ func ShouldAlert(hostname string) bool {
 	err := m_init.DB.Raw("SELECT warning_time FROM warnings WHERE host_name = ? ORDER BY warning_time DESC LIMIT 1", hostname).Scan(&latestTime).Error
 
 	if err != nil {
-   	 	log.Printf("查询错误: %v", err)
-    		if err == gorm.ErrRecordNotFound {
-        		fmt.Println("没有历史记录，可以告警")
-        		return true
-   		}
     		return false
 	}
 
-	if latestTime == nil {
+	if latestTime.IsZero() {
    		 fmt.Println("warning_time 是 NULL，视为无记录")
     		return true
 	}
-// 获取当前时间
-//	var now time.Time
-//	err = m_init.DB.Raw("SELECT CURRENT_TIMESTAMP").Scan(&now).Error
-//	if err != nil {
-//    		log.Printf("获取数据库时间失败: %v", err)
-//  		return false
-//	}
 	now := time.Now().UTC()
 
 	coolDownPeriod := 10 * time.Minute
-	timeDifference := now.Sub(latestTime)
-	exceedsCoolDown := timeDifference > coolDownPeriod
+	exceedsCoolDown := now.Sub(latestTime) > coolDownPeriod
 
 	fmt.Printf("最新告警时间为: %v\n", latestTime)
 	fmt.Printf("当前时间为: %v\n", now)
-	fmt.Printf("距离上次告警的时间差为: %v\n", timeDifference)
 	fmt.Printf("是否超过冷静期（%v）: %v\n", coolDownPeriod, exceedsCoolDown)
 
 	return exceedsCoolDown
@@ -101,7 +87,7 @@ func ShouldAlert(hostname string) bool {
 func handleAlert(requestData RequestData) {
 	ctx := context.Background()
 	hostname := requestData.HostInfo.Hostname
-
+	fmt.Println("hostname:",hostname)
 	// 从 Redis 读取阈值
 	memKey := fmt.Sprintf("mem_threshold:%s", hostname)
 	cpuKey := fmt.Sprintf("cpu_threshold:%s", hostname)
@@ -122,15 +108,33 @@ func handleAlert(requestData RequestData) {
 	// 判断类型
 	cpuAlert := false
 	memAlert := false
-	if requestData.MemInfo.UserPercent > memThreshold {
+	if requestData.MemInfo.UserPercent > memThreshold * 100 {
 		memAlert = true
 	}
-	for _, data := range requestData.CPUInfo { // 遍历每一个CPU核心
-		if data.Percent > cpuThreshold {
-			cpuAlert = true
-			break
-		}
+	// 计算所有 CPU 核心的平均使用率
+	var totalCPUPercent float64
+	var coreCount int
+	for _, data := range requestData.CPUInfo {
+   		totalCPUPercent += data.Percent
+    		coreCount++
 	}
+
+	var avgCPUPercent float64
+	if coreCount > 0 {
+    		avgCPUPercent = totalCPUPercent / float64(coreCount)
+	}
+
+
+
+
+fmt.Println(requestData.MemInfo.UserPercent, " ", memThreshold, " ", avgCPUPercent, " ", cpuThreshold)
+
+
+
+
+	// 判断平均是否超阈值
+	cpuAlert = avgCPUPercent > cpuThreshold * 100
+	
 	if cpuAlert && memAlert {
 		warningType = "CPU与内存"
 		alertMessages = "CPU与内存告警"
