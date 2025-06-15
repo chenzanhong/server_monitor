@@ -80,11 +80,11 @@ func (HostAndToken) TableName() string {
 }
 
 type SSHPort struct {
-	ID         int       `json:"id"`
-	Port       int       `json:"port" gorm:"column:port"`
-	IsUsed     bool      `json:"is_used" gorm:"default:false"`
-	AssignedTo string    `json:"assigned_to" gorm:"column:assigned_to"`
-	UpdatedAt  time.Time `json:"updated_at" gorm:"column:updated_at"`
+	ID        int       `json:"id"`
+	Port      int       `json:"port" gorm:"column:port"`
+	IsUsed    bool      `json:"is_used" gorm:"default:false"`
+	Hostname  string    `json:"hostname" gorm:"column:hostname"`
+	UpdatedAt time.Time `json:"updated_at" gorm:"column:updated_at"`
 }
 
 // Warning 定义告警记录结构体

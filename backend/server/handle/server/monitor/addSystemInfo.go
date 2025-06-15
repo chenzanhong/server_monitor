@@ -200,19 +200,6 @@ fmt.Println(requestData.MemInfo.UserPercent, " ", memThreshold, " ", avgCPUPerce
 	}
 }
 
-// AddSystemInfo 接收并处理系统监控数据
-//
-// @Summary 接收系统监控信息（CPU、内存、主机信息等）
-// @Description 该API用于接收客户端发送的系统监控数据，并验证token和JWT后将数据存储到数据库中。
-// @Tags Monitor
-// @Accept json
-// @Produce json
-// @Param request body RequestData true "请求体包含系统监控数据"
-// @Success 201 {object} map[string]string "成功响应"
-// @Failure 400 {object} map[string]string "无效的JSON数据或令牌长度错误"
-// @Failure 401 {object} map[string]string "授权头缺失或无效的token格式或无效的JWT token"
-// @Failure 500 {object} map[string]string "数据库操作失败"
-// @Router /monitor [post]
 func ReceiveAndStoreSystemMetrics(c *gin.Context) {
 	// 解析请求数据
 	var requestData RequestData

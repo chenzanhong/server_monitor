@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS ssh_ports (
 	id SERIAL PRIMARY KEY,
     port INT,
     is_used BOOLEAN NOT NULL DEFAULT FALSE,
-    assigned_to TEXT,
+    hostname VARCHAR(255), 
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -753,7 +753,7 @@ func insertNotices(tx *gorm.DB) error {
 	return scanner.Err()
 }
 
-// insertPortPool 函数从 portpool.txt 文件中读取端口池数据
+// insertPortPool 根据配置文件config.yaml的参数初始化ssh_ports表
 func initPortPool(tx *gorm.DB) error {
 	startPort := cf.StartPort
 	endPort := cf.EndPort
