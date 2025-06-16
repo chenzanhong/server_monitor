@@ -110,6 +110,7 @@ esac
 mkdir -p "$AGENT_DIR"
 cd "$AGENT_DIR" || { echo "无法创建或进入目录 $AGENT_DIR"; exit 1; }
 
+echo "代理程序agent所在目录："
 pwd
 
 git clone "$GITHUB_REPO" .
@@ -480,6 +481,7 @@ esac
 mkdir -p "$AGENT_DIR"
 cd "$AGENT_DIR" || { echo "无法创建或进入目录 $AGENT_DIR"; exit 1; }
 
+echo "代理程序agent所在目录："
 pwd
 
 git clone "$GITHUB_REPO" .
@@ -669,6 +671,7 @@ func GetCombinedScript(c *gin.Context) {
 		return
 	}
 	sshport.Hostname = hostname
+  sshport.IsUsed = true
 	err = m_init.DB.Save(&sshport).Error
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "更新ssh_port表失败：" + err.Error()})
