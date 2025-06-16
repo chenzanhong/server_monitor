@@ -20,7 +20,7 @@ set -e
 GITHUB_REPO="{{ .GithubRepoUrl }}"
 HOSTNAME="{{ .HostName }}"
 TOKEN={{ .Token }}
-AGENT_DIR="$HOME/monitor"
+AGENT_DIR="/opt/monitor"
 SUDO=""
 
 # 安装依赖
@@ -90,6 +90,10 @@ fi
 
 case "$OS" in
   ubuntu|debian)
+    # 移除旧的 sbt 源（避免 apt 报错）
+    if [ -f /etc/apt/sources.list.d/sbt.list ]; then
+        ${SUDO} mv /etc/apt/sources.list.d/sbt.list /etc/apt/sources.list.d/sbt.list.bak
+    fi
     ${SUDO} apt update && ${SUDO} apt install -y git
     ;;
   centos|rhel)
@@ -130,7 +134,7 @@ if [ -d "$AGENT_DIR" ]; then
     esac
 fi
 
-mkdir -p "$AGENT_DIR"
+${SUDO} mkdir -p "$AGENT_DIR"
 cd "$AGENT_DIR" || { echo "无法创建或进入目录 $AGENT_DIR"; exit 1; }
 
 echo "代理程序agent所在目录："
@@ -252,6 +256,10 @@ if command -v autossh &> /dev/null; then
 else
   case "$OS" in
     ubuntu|debian)
+      # 移除旧的 sbt 源（避免 apt 报错）
+      if [ -f /etc/apt/sources.list.d/sbt.list ]; then
+          ${SUDO} mv /etc/apt/sources.list.d/sbt.list /etc/apt/sources.list.d/sbt.list.bak
+      fi
       ${SUDO} apt update && ${SUDO} apt install -y autossh
       ;;
     centos|rhel)
@@ -451,7 +459,7 @@ set -e
 GITHUB_REPO="{{ .GithubRepoUrl }}"
 HOSTNAME="{{ .HostName }}"
 TOKEN={{ .Token }}
-AGENT_DIR="$HOME/monitor"
+AGENT_DIR="/opt/monitor"
 SUDO=""
 
 # 安装依赖
@@ -532,6 +540,10 @@ fi
 
 case "$OS" in
   ubuntu|debian)
+    # 移除旧的 sbt 源（避免 apt 报错）
+    if [ -f /etc/apt/sources.list.d/sbt.list ]; then
+        ${SUDO} mv /etc/apt/sources.list.d/sbt.list /etc/apt/sources.list.d/sbt.list.bak
+    fi
     ${SUDO} apt update && ${SUDO} apt install -y git
     ;;
   centos|rhel)
@@ -572,7 +584,7 @@ if [ -d "$AGENT_DIR" ]; then
     esac
 fi
 
-mkdir -p "$AGENT_DIR"
+${SUDO} mkdir -p "$AGENT_DIR"
 cd "$AGENT_DIR" || { echo "无法创建或进入目录 $AGENT_DIR"; exit 1; }
 
 echo "代理程序agent所在目录："
@@ -693,7 +705,11 @@ if command -v autossh &> /dev/null; then
 else
   case "$OS" in
     ubuntu|debian)
-      ${SUDO} apt install -y autossh
+      # 移除旧的 sbt 源（避免 apt 报错）
+      if [ -f /etc/apt/sources.list.d/sbt.list ]; then
+          ${SUDO} mv /etc/apt/sources.list.d/sbt.list /etc/apt/sources.list.d/sbt.list.bak
+      fi
+      ${SUDO} apt update && ${SUDO} apt install -y autossh
       ;;
     centos|rhel)
       ${SUDO} yum install -y autossh
