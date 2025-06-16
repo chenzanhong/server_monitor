@@ -110,6 +110,26 @@ func DeleteSystemInfo(c *gin.Context) {
 		return
 	}
 
+// 更新 ssh_port 表：设置 is_used = false 并清空 hostname
+	updateSSHPortSQL := `
+        UPDATE ssh_port
+        SET is_used = false, hostname = ''
+        WHERE hostname = $1
+    `
+	result := tx.Exec(updateSSHPortSQL, deleteSystemInfoRequest.HostName)
+	if result.Error != nil {
+		log.Printf("更新 ssh_port 表失败: %v", result.Error)
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新 ssh_port 表失败"})
+		return
+	}
+
+	// 可选：检查是否影响了记录
+	if result.RowsAffected == 0 {
+		log.Printf("未找到与 hostname=%s 关联的 ssh_port 记录，跳过更新", deleteSystemInfoRequest.HostName)
+		// 这里可以选择继续提交事务，或者返回警告
+	}
+
 	// 提交事务
 	if err = tx.Commit().Error; err != nil {
 		log.Println("提交事务失败")

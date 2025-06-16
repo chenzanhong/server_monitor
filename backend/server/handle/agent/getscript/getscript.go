@@ -382,7 +382,7 @@ func GetSSHScript(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "hostname参数不能为空"})
 		return
 	}
-  var sshport u.SSHPort
+	var sshport u.SSHPort
 	var port int
 	var err error
 
@@ -407,11 +407,11 @@ func GetSSHScript(c *gin.Context) {
 			return
 		}
 		sshport.Hostname = hostname
-    sshport.IsUsed = true
+		sshport.IsUsed = true
 		err = m_init.DB.Save(&sshport).Error
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("更新 ssh_port 表失败：%v", err)})
-		  return
+			return
 		}
 	}
 
@@ -793,11 +793,11 @@ func GetCombinedScript(c *gin.Context) {
 			return
 		}
 		sshport.Hostname = hostname
-    sshport.IsUsed = true
+		sshport.IsUsed = true
 		err = m_init.DB.Save(&sshport).Error
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("更新 ssh_port 表失败：%v", err)})
-		  return
+			return
 		}
 	}
 
@@ -871,7 +871,7 @@ func GenerateCombinedScriptBytes(hostname, token string) ([]byte, error) {
 			return nil, fmt.Errorf("查询ssh_port表失败：%v", err)
 		}
 		sshport.Hostname = hostname
-    sshport.IsUsed = true
+		sshport.IsUsed = true
 		err = m_init.DB.Save(&sshport).Error
 		if err != nil {
 			return nil, fmt.Errorf("更新ssh_port表失败：%v", err)
