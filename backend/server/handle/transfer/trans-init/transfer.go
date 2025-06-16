@@ -59,7 +59,7 @@ func CreateConnectionToPool(pool *g.SSHConnectionPool, server, user, auth string
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // 在生产环境中应该使用更安全的方式
 	}
-	fmt.Println("文件传输，用户：",user,"auth：",auth)
+	
 	// 通过server，即IP查询hostname
 	var host_info u.HostInfo
 	err := m_init.DB.Where("ip = ?", server).First(&host_info).Error
@@ -77,7 +77,7 @@ func CreateConnectionToPool(pool *g.SSHConnectionPool, server, user, auth string
 	}
 
 
-	fmt.Println("hostname:", host_info.Hostname, " port:", sshport.Port)
+	fmt.Println("文件传输，用户：", user, " auth：",auth, " hostname:", host_info.Hostname, " port:", sshport.Port)
 
 	client, err := ssh.Dial("tcp", fmt.Sprintf("localhost:%d", sshport.Port), config)
 	if err != nil {

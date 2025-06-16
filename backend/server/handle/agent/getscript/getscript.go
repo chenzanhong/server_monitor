@@ -351,6 +351,7 @@ func GetSSHScript(c *gin.Context) {
 		return
 	}
 	sshport.Hostname = hostname
+  sshport.IsUsed = true
 	err = m_init.DB.Save(&sshport).Error
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "更新ssh_port表失败：" + err.Error()})

@@ -1,5 +1,5 @@
 # 公网服务器配置
-IP: 47.86.232.20
+IP: 113.44.170.52
 1. 确保SSH服务已启用并允许远程登录
 ```bash
 sudo systemctl status sshd
@@ -62,7 +62,7 @@ cat ~/.ssh/id_rsa.pub
 3. 启动反向SSH隧道（测试用）
 手动测试一下是否能成功建立隧道
 ```bash
-autossh -M 0 -f -N -o "StrictHostKeyChecking=no" -R 2222:localhost:22 reversessh@47.86.232.20
+autossh -M 0 -f -N -o "StrictHostKeyChecking=no" -R 2222:localhost:22 reversessh@113.44.170.52
 ```
 说明：
 -R 2222:localhost:22: 将公网服务器的2222端口转发到本机22端口（SSH）
@@ -84,7 +84,7 @@ After=network.target
 
 [Service]
 User=<your_local_user>  # 替换为实际用户名
-ExecStart=/usr/bin/autossh -M 0 -N -o "StrictHostKeyChecking=no" -R 2222:localhost:22 reversessh@47.86.232.20
+ExecStart=/usr/bin/autossh -M 0 -N -o "StrictHostKeyChecking=no" -R 2222:localhost:22 reversessh@113.44.170.52
 Restart=always
 RestartSec=5
 
