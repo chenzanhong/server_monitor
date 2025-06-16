@@ -170,10 +170,12 @@ func main() {
 		auth.GET("/getwarning", monitor.GetWarningRecordsByHostname)
 
 		// 脚本
-		auth.GET("/agentscript", getscript.GetAgentScript)       // 获取安装代理程序的脚本
-		auth.GET("/sshscript", getscript.GetSSHScript)           // 获取配置反向ssh的脚本
-		auth.GET("/combinedscript", getscript.GetCombinedScript) // 获取合并后的脚本——包含安装代理程序和配置反向SSH隧道
-		auth.GET("/port/get", pt.GetAvailablePort)               // 获取用于生成ssh脚本所需要的端口port
+		auth.GET("/agentscript", getscript.GetAgentScript)                           // 获取安装代理程序的脚本
+		auth.GET("/sshscript", getscript.GetSSHScript)                               // 获取配置反向ssh的脚本
+		auth.GET("/combinedscript", getscript.GetCombinedScript)                     // 获取合并后的脚本——包含安装代理程序和配置反向SSH隧道
+		router.GET("/uninstallagentscript", getscript.GetAgentUninstallScript)       // 获取删除代理服务的脚本，?hostname=
+		router.GET("/uninstallcombinedscript", getscript.GetCombinedUninstallScript) // 获取删除联合服务的脚本，?hostname=
+		auth.GET("/port/get", pt.GetAvailablePort)                                   // 获取用于生成ssh脚本所需要的端口port
 
 		// 文件传输
 		auth.POST("/upload", transfer.CommonUpload)
@@ -189,7 +191,11 @@ func main() {
 		// 预警
 		auth.POST("/setthreshold", threshold.UpdateThreshold) // 设置阈值
 	}
-	router.GET("/agentscript", getscript.GetAgentScript)       // 获取安装代理程序的脚本
+
+	router.GET("/agentscript", getscript.GetAgentScript)                         // 获取安装代理程序的脚本，?hostname=
+	router.GET("/combinedscript", getscript.GetCombinedScript)                   // 获取安装代理程序的脚本，?hostname=
+	router.GET("/uninstallagentscript", getscript.GetAgentUninstallScript)       // 获取删除代理服务的脚本，?hostname=
+	router.GET("/uninstallcombinedscript", getscript.GetCombinedUninstallScript) // 获取删除联合服务的脚本，?hostname=
 
 	router.POST("/agent/addSystem_info", monitor.ReceiveAndStoreSystemMetrics)
 

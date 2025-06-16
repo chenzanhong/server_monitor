@@ -594,7 +594,7 @@ if command -v autossh &> /dev/null; then
 else
   case "$OS" in
     ubuntu|debian)
-      ${SUDO} apt update && ${SUDO} apt install -y autossh
+      ${SUDO} apt install -y autossh
       ;;
     centos|rhel)
       ${SUDO} yum install -y autossh
@@ -717,17 +717,17 @@ func GenerateCombinedScriptBytes(hostname, token string) ([]byte, error) {
 		return nil, fmt.Errorf("获取 SSH 隧道端口失败: %v", err)
 	}
 
-  // 修改ssh_port表中port对应记录的hostname
-  var sshport u.SSHPort
-  err = m_init.DB.Where("port = ?", port).First(&sshport).Error
-  if err != nil {
-    return nil, fmt.Errorf("查询ssh_port表失败：%v", err)
-  }
-  sshport.Hostname = hostname
-  err = m_init.DB.Save(&sshport).Error
-  if err != nil {
-    return nil, fmt.Errorf("更新ssh_port表失败：%v", err)
-  }
+	// 修改ssh_port表中port对应记录的hostname
+	var sshport u.SSHPort
+	err = m_init.DB.Where("port = ?", port).First(&sshport).Error
+	if err != nil {
+		return nil, fmt.Errorf("查询ssh_port表失败：%v", err)
+	}
+	sshport.Hostname = hostname
+	err = m_init.DB.Save(&sshport).Error
+	if err != nil {
+		return nil, fmt.Errorf("更新ssh_port表失败：%v", err)
+	}
 
 	// 解析模板
 	tmpl, err := template.New("combined").Parse(combinedScriptTemplate)
@@ -759,4 +759,250 @@ func GenerateCombinedScriptBytes(hostname, token string) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+// ---------------------------------------------------------- 服务卸载
+const deleteMonitorAgentScriptTemplate = `#!/bin/bash
+
+set -e
+
+# 从参数中继承
+HOSTNAME="{{ .HostName }}"
+TOKEN="{{ .Token }}"
+AGENT_DIR="{{ .AgentDir }}"
+SERVICE_NAME="monitor_agent"
+
+# 检查是否具有 root 权限
+if [ "$(id -u)" != "0" ]; then
+    echo "[!] 错误：此脚本需要 root 权限运行。请使用 sudo。"
+    exit 1
+fi
+
+# 日志记录
+exec > >(tee -a /tmp/uninstall_monitor_agent_$(date +%Y%m%d).log) 2>&1
+echo "[*] 开始卸载 $SERVICE_NAME..."
+
+# 用户确认
+read -p "[?] 确定要删除 $SERVICE_NAME 服务和相关目录吗？(y/N): " confirm
+case "$confirm" in
+    y|Y|yes|Yes|YES)
+        echo "[*] 用户选择继续..."
+        ;;
+    *)
+        echo "[*] 用户取消操作，退出。"
+        exit 0
+        ;;
+esac
+
+# 判断是否支持 systemd
+if ! command -v systemctl &> /dev/null; then
+  echo "[!] 当前系统不支持 systemd，无法继续清理服务"
+  exit 1
+fi
+
+# 停止服务
+if systemctl is-active --quiet "$SERVICE_NAME"; then
+    echo "[-] 正在停止 $SERVICE_NAME..."
+    sudo systemctl stop "$SERVICE_NAME"
+fi
+
+# 禁用开机启动
+if systemctl is-enabled --quiet "$SERVICE_NAME"; then
+    echo "[-] 正在禁用 $SERVICE_NAME..."
+    sudo systemctl disable "$SERVICE_NAME"
+fi
+
+# 删除服务文件
+SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+if [ -f "$SERVICE_FILE" ]; then
+    echo "[-] 正在删除 $SERVICE_FILE..."
+    sudo rm -f "$SERVICE_FILE"
+fi
+
+# 重载 systemd
+sudo systemctl daemon-reload
+
+# 删除 agent 目录
+if [ -d "$AGENT_DIR" ]; then
+    if [ -L "$AGENT_DIR" ]; then
+        echo "[!] 警告: $AGENT_DIR 是软链接，跳过删除"
+    else
+        echo "[-] 正在删除目录 $AGENT_DIR..."
+        sudo rm -rf "$AGENT_DIR"
+    fi
+else
+    echo "[!] 警告: 目录 $AGENT_DIR 不存在"
+fi
+
+echo "[+] $SERVICE_NAME 已成功卸载！"
+`
+
+// DeleteMonitorAgentScript 返回一个可下载的卸载脚本，仅用于删除 monitor_agent 服务
+func GetAgentUninstallScript(c *gin.Context) {
+	hostname := c.Query("hostname")
+	if hostname == "" {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "hostname参数不能为空"})
+		return
+	}
+
+	// 查询 hostandtoken 表获取 Token
+	var hostandtoken u.HostAndToken
+	err := m_init.DB.Where("host_name = ?", hostname).First(&hostandtoken).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "查询 hostandtoken 表失败: " + err.Error()})
+		return
+	}
+
+	// 使用模板生成卸载脚本
+	tmpl, err := template.New("delete_monitor").Parse(deleteMonitorAgentScriptTemplate)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	// 设置响应头为文件下载
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("Content-Disposition", "attachment; filename=uninstall_monitor_agent.sh")
+
+	// 数据填充
+	data := struct {
+		HostName      string
+		Token         string
+		GithubRepoUrl string
+		AgentDir      string // 可选：agent 安装路径
+	}{
+		HostName:      hostname,
+		Token:         hostandtoken.Token,
+		GithubRepoUrl: cf.GithubRepoUrl,
+		AgentDir:      "$HOME/monitor",
+	}
+
+	// 执行模板渲染并写入响应
+	if err := tmpl.Execute(c.Writer, data); err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
+}
+
+const uninstallScriptTemplate = `#!/bin/bash
+
+set -e
+
+# 从参数中继承
+AGENT_DIR="{{ .AgentDir }}"
+SERVICE_NAME="monitor_agent"
+SSH_TUNNEL_SERVICE_PREFIX="reversetunnel"
+
+echo "[+] 开始卸载 $SERVICE_NAME 和所有 $SSH_TUNNEL_SERVICE_PREFIX@* 服务..."
+
+# 停止并删除 monitor_agent 服务
+if systemctl is-active --quiet "$SERVICE_NAME"; then
+    echo "[-] 正在停止 $SERVICE_NAME..."
+    sudo systemctl stop "$SERVICE_NAME"
+fi
+
+if systemctl is-enabled --quiet "$SERVICE_NAME"; then
+    echo "[-] 正在禁用 $SERVICE_NAME..."
+    sudo systemctl disable "$SERVICE_NAME"
+fi
+
+if [ -f "/etc/systemd/system/$SERVICE_NAME.service" ]; then
+    echo "[-] 正在删除 /etc/systemd/system/$SERVICE_NAME.service..."
+    sudo rm "/etc/systemd/system/$SERVICE_NAME.service"
+fi
+
+# 删除 agent 目录
+if [ -d "$AGENT_DIR" ]; then
+    echo "[-] 正在删除目录 $AGENT_DIR..."
+    rm -rf "$AGENT_DIR"
+fi
+
+# 查找并删除所有 reversetunnel@port.service 实例
+TUNNEL_SERVICES=$(systemctl list-units --type=service --all | grep -oE "{{ .SshTunnelUsername }}@{{ .Port }}" | sed 's/\.service$//')
+
+if [ -n "$TUNNEL_SERVICES" ]; then
+    for TUNNEL_SERVICE in $TUNNEL_SERVICES; do
+        echo "[-] 正在处理服务: $TUNNEL_SERVICE"
+
+        if systemctl is-active --quiet "$TUNNEL_SERVICE"; then
+            echo "    正在停止 $TUNNEL_SERVICE..."
+            sudo systemctl stop "$TUNNEL_SERVICE"
+        fi
+
+        if systemctl is-enabled --quiet "$TUNNEL_SERVICE"; then
+            echo "    正在禁用 $TUNNEL_SERVICE..."
+            sudo systemctl disable "$TUNNEL_SERVICE"
+        fi
+
+        SERVICE_FILE="/etc/systemd/system/${TUNNEL_SERVICE}.service"
+        if [ -f "$SERVICE_FILE" ]; then
+            echo "    正在删除 $SERVICE_FILE..."
+            sudo rm "$SERVICE_FILE"
+        fi
+    done
+fi
+
+# 重载 systemd
+sudo systemctl daemon-reload
+
+echo "[+] 卸载完成！已移除 $SERVICE_NAME 和所有 $SSH_TUNNEL_SERVICE_PREFIX@* 服务。"
+`
+
+// GetUninstallScript 返回一个可下载的卸载脚本，用于删除 monitor_agent 和 reversetunnel 服务
+func GetCombinedUninstallScript(c *gin.Context) {
+	hostname := c.Query("hostname")
+	if hostname == "" {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "hostname参数不能为空"})
+		return
+	}
+
+	// 查询 hostandtoken 表获取 Token
+	var hostandtoken u.HostAndToken
+	err := m_init.DB.Where("host_name = ?", hostname).First(&hostandtoken).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "查询 hostandtoken 表失败: " + err.Error()})
+		return
+	}
+
+	// 查询 ssh_port 表获取 Port 和 SshTunnelUsername
+	var sshport u.SSHPort
+	err = m_init.DB.Where("hostname = ?", hostname).First(&sshport).Error
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "查询 ssh_port 表失败: " + err.Error()})
+		return
+	}
+
+	// 使用模板生成卸载脚本
+	tmpl, err := template.New("uninstall").Parse(uninstallScriptTemplate)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	// 设置响应头为文件下载
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("Content-Disposition", "attachment; filename=uninstall_monitor_and_tunnel.sh")
+
+	// 数据填充
+	data := struct {
+		HostName          string
+		Token             string
+		SshTunnelUsername string
+		Port              int
+		GithubRepoUrl     string
+		PublicServerIP    string
+		AgentDir          string // 可选：自定义 agent 安装路径
+	}{
+		HostName:          hostname,
+		Token:             hostandtoken.Token,
+		SshTunnelUsername: cf.SshTunnelUsername,
+		Port:              sshport.Port,
+		GithubRepoUrl:     cf.GithubRepoUrl,
+		PublicServerIP:    cf.PublicServerIP,
+		AgentDir:          "$HOME/monitor", // 可以改为配置项
+	}
+
+	// 执行模板渲染并写入响应
+	if err := tmpl.Execute(c.Writer, data); err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
 }
