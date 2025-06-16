@@ -749,10 +749,10 @@ func GetCombinedScript(c *gin.Context) {
 	}{
 		GithubRepoUrl:     cf.GithubRepoUrl,
 		PublicServerIP:    cf.PublicServerIP,
-		SshTunnelPassword: cf.SshTunnelPassword,
 		HostName:          hostname,
 		Token:             hostandtoken.Token,
 		SshTunnelUsername: cf.SshTunnelUsername,
+		SshTunnelPassword: cf.SshTunnelPassword,
 		Port:              port,
 	}
 
@@ -798,6 +798,7 @@ func GenerateCombinedScriptBytes(hostname, token string) ([]byte, error) {
 		HostName          string
 		Token             string
 		SshTunnelUsername string
+		SshTunnelPassword string
 		Port              int
 	}{
 		GithubRepoUrl:     cf.GithubRepoUrl,
@@ -805,6 +806,7 @@ func GenerateCombinedScriptBytes(hostname, token string) ([]byte, error) {
 		HostName:          hostname,
 		Token:             token,
 		SshTunnelUsername: cf.SshTunnelUsername,
+		SshTunnelPassword: cf.SshTunnelPassword,
 		Port:              port,
 	}
 
