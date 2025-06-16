@@ -13,7 +13,7 @@ import (
 )
 
 // ListAgent 用于查询所有主机信息
-func ListAgent(c *gin.Context) {
+func HostInfoList(c *gin.Context) {
 	// 从上下文中获取用户名
 	Username, exists := c.Get("username")
 	if !exists {
@@ -53,16 +53,24 @@ func ListAgent(c *gin.Context) {
 
 	// 使用 GORM 查询
 	var hosts []u.HostInfo
-	result := m_init.DB.Table("host_info").
-		Where("user_name = ? AND created_at BETWEEN ? AND ?", username, fromTime, toTime).
-		Order("created_at DESC"). // 可选排序
-		Find(&hosts)
+	if username == "root" {
+		err = m_init.DB.Table("host_info").
+			Where("created_at BETWEEN ? AND ?", fromTime, toTime).
+			Order("created_at DESC"). // 可选排序
+			Find(&hosts).Error
 
-	if result.Error != nil {
-		log.Println(logs.GetLogPrefix(2)+"Failed to query host_info; details:", result.Error.Error())
+	} else {
+		err = m_init.DB.Table("host_info").
+			Where("user_name = ? AND created_at BETWEEN ? AND ?", username, fromTime, toTime).
+			Order("created_at DESC"). // 可选排序
+			Find(&hosts).Error
+	}
+
+	if err != nil {
+		log.Println("Failed to query host_info; details:", err.Error)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Failed to query host_info",
-			"details": result.Error.Error(),
+			"details": err.Error,
 		})
 		return
 	}

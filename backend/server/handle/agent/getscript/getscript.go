@@ -308,7 +308,11 @@ After=network.target
 
 [Service]
 User=$(whoami)
-ExecStart=/usr/bin/sshpass -p '${SSH_TUNNEL_PASS}' /usr/bin/autossh -M 0 -N -o "StrictHostKeyChecking=no" -R %i:localhost:22 ${SSH_TUNNEL_USER}@${PUBLIC_SERVER_IP}
+
+ExecStart=/usr/bin/sshpass -p '${SSH_TUNNEL_PASS}' /usr/bin/autossh -M 0 -N \
+  -o "StrictHostKeyChecking=no" \
+  -o "UserKnownHostsFile=/dev/null" \
+  -R %i:localhost:22 ${SSH_TUNNEL_USER}@${PUBLIC_SERVER_IP}
 Restart=always
 RestartSec=5
 
@@ -590,14 +594,14 @@ cd "$AGENT_DIR" || { echo "无法创建或进入目录 $AGENT_DIR"; exit 1; }
 echo "代理程序agent所在目录："
 pwd
 
-git clone "$GITHUB_REPO" .
+${SUDO} git clone "$GITHUB_REPO" .
 cd agent || { echo "找不到目录 agent，请检查仓库结构"; exit 1; }
 
 # 编译 main
 # go build -o main .
 
 # 授予执行权限并运行主程序
-chmod +x main
+${SUDO} chmod +x main
 # ./main -hostname=${HOSTNAME} -token=${TOKEN} &
 
 cat > /tmp/monitor_agent.service <<EOF
@@ -757,7 +761,12 @@ After=network.target
 
 [Service]
 User=$(whoami)
-ExecStart=/usr/bin/sshpass -p '${SSH_TUNNEL_PASS}' /usr/bin/autossh -M 0 -N -o "StrictHostKeyChecking=no" -R %i:localhost:22 ${SSH_TUNNEL_USER}@${PUBLIC_SERVER_IP}
+
+ExecStart=/usr/bin/sshpass -p '${SSH_TUNNEL_PASS}' /usr/bin/autossh -M 0 -N \
+  -o "StrictHostKeyChecking=no" \
+  -o "UserKnownHostsFile=/dev/null" \
+  -R %i:localhost:22 ${SSH_TUNNEL_USER}@${PUBLIC_SERVER_IP}
+
 Restart=always
 RestartSec=5
 
@@ -936,7 +945,7 @@ set -e
 # 从参数中继承
 HOSTNAME="{{ .HostName }}"
 TOKEN="{{ .Token }}"
-AGENT_DIR="{{ .AgentDir }}"
+AGENT_DIR="/opt/monitor"
 SERVICE_NAME="monitor_agent"
 
 # 检查是否具有 root 权限
@@ -1036,12 +1045,10 @@ func GetAgentUninstallScript(c *gin.Context) {
 		HostName      string
 		Token         string
 		GithubRepoUrl string
-		AgentDir      string // 可选：agent 安装路径
 	}{
 		HostName:      hostname,
 		Token:         hostandtoken.Token,
 		GithubRepoUrl: cf.GithubRepoUrl,
-		AgentDir:      "$HOME/monitor",
 	}
 
 	// 执行模板渲染并写入响应
@@ -1050,18 +1057,47 @@ func GetAgentUninstallScript(c *gin.Context) {
 	}
 }
 
-const uninstallScriptTemplate = `#!/bin/bash
+const uninstallCombinedScriptTemplate = `#!/bin/bash
 
 set -e
 
 # 从参数中继承
-AGENT_DIR="{{ .AgentDir }}"
+AGENT_DIR="/opt/monitor"
 SERVICE_NAME="monitor_agent"
 SSH_TUNNEL_SERVICE_PREFIX="reversetunnel"
 
-echo "[+] 开始卸载 $SERVICE_NAME 和所有 $SSH_TUNNEL_SERVICE_PREFIX@* 服务..."
+# 日志记录
+exec > >(tee -a /tmp/uninstall_combined_monitor_$(date +%Y%m%d).log) 2>&1
+echo "[*] 开始卸载 $SERVICE_NAME 和所有 ${SSH_TUNNEL_SERVICE_PREFIX}@* 服务..."
 
-# 停止并删除 monitor_agent 服务
+# 检查是否具有 root 权限
+if [ "$(id -u)" != "0" ]; then
+    echo "[!] 错误：此脚本需要 root 权限运行。请使用 sudo。"
+    exit 1
+fi
+
+# 用户确认
+read -p "[?] 确定要删除 $SERVICE_NAME 服务及所有反向隧道服务吗？(y/N): " confirm
+case "$confirm" in
+    y|Y|yes|Yes|YES)
+        echo "[*] 用户选择继续..."
+        ;;
+    *)
+        echo "[*] 用户取消操作，退出。"
+        exit 0
+        ;;
+esac
+
+# 判断是否支持 systemd
+if ! command -v systemctl &> /dev/null; then
+  echo "[!] 当前系统不支持 systemd，无法继续清理服务"
+  exit 1
+fi
+
+# ================================
+# 1. 卸载 monitor_agent 主服务
+# ================================
+
 if systemctl is-active --quiet "$SERVICE_NAME"; then
     echo "[-] 正在停止 $SERVICE_NAME..."
     sudo systemctl stop "$SERVICE_NAME"
@@ -1072,19 +1108,30 @@ if systemctl is-enabled --quiet "$SERVICE_NAME"; then
     sudo systemctl disable "$SERVICE_NAME"
 fi
 
-if [ -f "/etc/systemd/system/$SERVICE_NAME.service" ]; then
-    echo "[-] 正在删除 /etc/systemd/system/$SERVICE_NAME.service..."
-    sudo rm "/etc/systemd/system/$SERVICE_NAME.service"
+SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+if [ -f "$SERVICE_FILE" ]; then
+    echo "[-] 正在删除 $SERVICE_FILE..."
+    sudo rm -f "$SERVICE_FILE"
 fi
 
-# 删除 agent 目录
+# 删除 agent 目录（排除软链接）
 if [ -d "$AGENT_DIR" ]; then
-    echo "[-] 正在删除目录 $AGENT_DIR..."
-    rm -rf "$AGENT_DIR"
+    if [ -L "$AGENT_DIR" ]; then
+        echo "[!] 警告: $AGENT_DIR 是软链接，跳过删除"
+    else
+        echo "[-] 正在删除目录 $AGENT_DIR..."
+        sudo rm -rf "$AGENT_DIR"
+    fi
+else
+    echo "[!] 警告: 目录 $AGENT_DIR 不存在"
 fi
 
-# 查找并删除所有 reversetunnel@port.service 实例
-TUNNEL_SERVICES=$(systemctl list-units --type=service --all | grep -oE "{{ .SshTunnelUsername }}@{{ .Port }}" | sed 's/\.service$//')
+# ================================
+# 2. 卸载所有 reversetunnel@xxx 服务
+# ================================
+
+# 获取所有 reversetunnel@*.service 实例
+TUNNEL_SERVICES=$(systemctl list-units --type=service --all | grep -E "${SSH_TUNNEL_SERVICE_PREFIX}@[0-9]+\.service" | awk '{print $1}')
 
 if [ -n "$TUNNEL_SERVICES" ]; then
     for TUNNEL_SERVICE in $TUNNEL_SERVICES; do
@@ -1100,10 +1147,10 @@ if [ -n "$TUNNEL_SERVICES" ]; then
             sudo systemctl disable "$TUNNEL_SERVICE"
         fi
 
-        SERVICE_FILE="/etc/systemd/system/${TUNNEL_SERVICE}.service"
+        SERVICE_FILE="/etc/systemd/system/${TUNNEL_SERVICE}"
         if [ -f "$SERVICE_FILE" ]; then
             echo "    正在删除 $SERVICE_FILE..."
-            sudo rm "$SERVICE_FILE"
+            sudo rm -f "$SERVICE_FILE"
         fi
     done
 fi
@@ -1111,7 +1158,7 @@ fi
 # 重载 systemd
 sudo systemctl daemon-reload
 
-echo "[+] 卸载完成！已移除 $SERVICE_NAME 和所有 $SSH_TUNNEL_SERVICE_PREFIX@* 服务。"
+echo "[+] 所有服务已成功卸载！"
 `
 
 // GetUninstallScript 返回一个可下载的卸载脚本，用于删除 monitor_agent 和 reversetunnel 服务
@@ -1139,7 +1186,7 @@ func GetCombinedUninstallScript(c *gin.Context) {
 	}
 
 	// 使用模板生成卸载脚本
-	tmpl, err := template.New("uninstall").Parse(uninstallScriptTemplate)
+	tmpl, err := template.New("uninstall").Parse(uninstallCombinedScriptTemplate)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
@@ -1157,7 +1204,6 @@ func GetCombinedUninstallScript(c *gin.Context) {
 		Port              int
 		GithubRepoUrl     string
 		PublicServerIP    string
-		AgentDir          string // 可选：自定义 agent 安装路径
 	}{
 		HostName:          hostname,
 		Token:             hostandtoken.Token,
@@ -1165,7 +1211,6 @@ func GetCombinedUninstallScript(c *gin.Context) {
 		Port:              sshport.Port,
 		GithubRepoUrl:     cf.GithubRepoUrl,
 		PublicServerIP:    cf.PublicServerIP,
-		AgentDir:          "$HOME/monitor", // 可以改为配置项
 	}
 
 	// 执行模板渲染并写入响应

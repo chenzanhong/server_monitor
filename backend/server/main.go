@@ -163,7 +163,7 @@ func main() {
 
 		// 监控
 		auth.POST("/install", install.InstallAgent)
-		auth.GET("/list", monitor.ListAgent)
+		auth.GET("/list", monitor.HostInfoList)
 		auth.GET("/monitor/:hostname", monitor.GetAgentInfo)
 		auth.GET("/monitor/status/:hostname", monitor.GetLatestSystemInfo)
 		auth.POST("/delete", monitor.DeleteSystemInfo)
