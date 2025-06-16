@@ -33,7 +33,7 @@ Match User reversessh
 sudo systemctl restart sshd
 ```
 
-# 内网服务器配置（被监控服务器）
+# 内网服务器配置（被监控服务器）————反向ssh脚本
 1. 安装 autossh
 Debian/Ubuntu：
 ```bash
