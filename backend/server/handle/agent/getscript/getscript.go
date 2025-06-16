@@ -948,14 +948,18 @@ TOKEN="{{ .Token }}"
 AGENT_DIR="/opt/monitor"
 SERVICE_NAME="monitor_agent"
 
-# 检查是否具有 root 权限
-if [ "$(id -u)" != "0" ]; then
-    echo "[!] 错误：此脚本需要 root 权限运行。请使用 sudo。"
-    exit 1
+# 检测操作系统（假设 detect_os 函数已定义）
+OS=$(detect_os)
+
+# 判断是否使用 sudo
+if command -v sudo &> /dev/null; then
+  SUDO="sudo"
+else
+  SUDO=""
 fi
 
 # 日志记录
-exec > >(tee -a /tmp/uninstall_monitor_agent_$(date +%Y%m%d).log) 2>&1
+${SUDO} exec > >(tee -a /tmp/uninstall_monitor_agent_$(date +%Y%m%d).log) 2>&1
 echo "[*] 开始卸载 $SERVICE_NAME..."
 
 # 用户确认
@@ -979,24 +983,24 @@ fi
 # 停止服务
 if systemctl is-active --quiet "$SERVICE_NAME"; then
     echo "[-] 正在停止 $SERVICE_NAME..."
-    sudo systemctl stop "$SERVICE_NAME"
+    ${SUDO} systemctl stop "$SERVICE_NAME"
 fi
 
 # 禁用开机启动
 if systemctl is-enabled --quiet "$SERVICE_NAME"; then
     echo "[-] 正在禁用 $SERVICE_NAME..."
-    sudo systemctl disable "$SERVICE_NAME"
+    ${SUDO} systemctl disable "$SERVICE_NAME"
 fi
 
 # 删除服务文件
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 if [ -f "$SERVICE_FILE" ]; then
     echo "[-] 正在删除 $SERVICE_FILE..."
-    sudo rm -f "$SERVICE_FILE"
+    ${SUDO} rm -f "$SERVICE_FILE"
 fi
 
 # 重载 systemd
-sudo systemctl daemon-reload
+${SUDO} systemctl daemon-reload
 
 # 删除 agent 目录
 if [ -d "$AGENT_DIR" ]; then
@@ -1004,7 +1008,7 @@ if [ -d "$AGENT_DIR" ]; then
         echo "[!] 警告: $AGENT_DIR 是软链接，跳过删除"
     else
         echo "[-] 正在删除目录 $AGENT_DIR..."
-        sudo rm -rf "$AGENT_DIR"
+        ${SUDO} rm -rf "$AGENT_DIR"
     fi
 else
     echo "[!] 警告: 目录 $AGENT_DIR 不存在"
@@ -1070,10 +1074,11 @@ SSH_TUNNEL_SERVICE_PREFIX="reversetunnel"
 exec > >(tee -a /tmp/uninstall_combined_monitor_$(date +%Y%m%d).log) 2>&1
 echo "[*] 开始卸载 $SERVICE_NAME 和所有 ${SSH_TUNNEL_SERVICE_PREFIX}@* 服务..."
 
-# 检查是否具有 root 权限
-if [ "$(id -u)" != "0" ]; then
-    echo "[!] 错误：此脚本需要 root 权限运行。请使用 sudo。"
-    exit 1
+# 判断是否使用 sudo
+if command -v sudo &> /dev/null; then
+  SUDO="sudo "
+else
+  SUDO=""
 fi
 
 # 用户确认
@@ -1100,18 +1105,18 @@ fi
 
 if systemctl is-active --quiet "$SERVICE_NAME"; then
     echo "[-] 正在停止 $SERVICE_NAME..."
-    sudo systemctl stop "$SERVICE_NAME"
+    ${SUDO}systemctl stop "$SERVICE_NAME"
 fi
 
 if systemctl is-enabled --quiet "$SERVICE_NAME"; then
     echo "[-] 正在禁用 $SERVICE_NAME..."
-    sudo systemctl disable "$SERVICE_NAME"
+    ${SUDO}systemctl disable "$SERVICE_NAME"
 fi
 
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 if [ -f "$SERVICE_FILE" ]; then
     echo "[-] 正在删除 $SERVICE_FILE..."
-    sudo rm -f "$SERVICE_FILE"
+    ${SUDO}rm -f "$SERVICE_FILE"
 fi
 
 # 删除 agent 目录（排除软链接）
@@ -1120,7 +1125,7 @@ if [ -d "$AGENT_DIR" ]; then
         echo "[!] 警告: $AGENT_DIR 是软链接，跳过删除"
     else
         echo "[-] 正在删除目录 $AGENT_DIR..."
-        sudo rm -rf "$AGENT_DIR"
+        ${SUDO}rm -rf "$AGENT_DIR"
     fi
 else
     echo "[!] 警告: 目录 $AGENT_DIR 不存在"
@@ -1139,24 +1144,24 @@ if [ -n "$TUNNEL_SERVICES" ]; then
 
         if systemctl is-active --quiet "$TUNNEL_SERVICE"; then
             echo "    正在停止 $TUNNEL_SERVICE..."
-            sudo systemctl stop "$TUNNEL_SERVICE"
+            ${SUDO}systemctl stop "$TUNNEL_SERVICE"
         fi
 
         if systemctl is-enabled --quiet "$TUNNEL_SERVICE"; then
             echo "    正在禁用 $TUNNEL_SERVICE..."
-            sudo systemctl disable "$TUNNEL_SERVICE"
+            ${SUDO}systemctl disable "$TUNNEL_SERVICE"
         fi
 
         SERVICE_FILE="/etc/systemd/system/${TUNNEL_SERVICE}"
         if [ -f "$SERVICE_FILE" ]; then
             echo "    正在删除 $SERVICE_FILE..."
-            sudo rm -f "$SERVICE_FILE"
+            ${SUDO}rm -f "$SERVICE_FILE"
         fi
     done
 fi
 
 # 重载 systemd
-sudo systemctl daemon-reload
+${SUDO}systemctl daemon-reload
 
 echo "[+] 所有服务已成功卸载！"
 `
