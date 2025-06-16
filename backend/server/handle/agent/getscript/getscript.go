@@ -382,26 +382,37 @@ func GetSSHScript(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "hostname参数不能为空"})
 		return
 	}
+  var sshport u.SSHPort
+	var port int
+	var err error
 
-	port, err := pt.GetUnusedPort()
-	if port == -1 {
-		c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"message": "获取反向ssh配置的脚本失败：" + err.Error()})
-		return
-	}
+	// 先尝试查找是否有已分配给该 hostname 的端口记录
+	err = m_init.DB.Where("hostname = ?", hostname).First(&sshport).Error
+	if err == nil {
+		// 已存在记录，使用现有端口
+		port = sshport.Port
+	} else {
+		// 不存在，获取一个新端口并更新记录
+		port, err = pt.GetUnusedPort()
+		if port == -1 {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"message": fmt.Sprintf("获取 SSH 隧道端口失败: %v", err.Error)})
+			return
+		}
 
-	// 修改ssh_port表中port对应记录的hostname
-	var sshport u.SSHPort
-	err = m_init.DB.Where("port = ?", port).First(&sshport).Error
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "查询ssh_port表失败：" + err.Error()})
-		return
-	}
-	sshport.Hostname = hostname
-	sshport.IsUsed = true
-	err = m_init.DB.Save(&sshport).Error
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "更新ssh_port表失败：" + err.Error()})
-		return
+		// 修改ssh_port表中port对应记录的hostname
+		var sshport u.SSHPort
+		err = m_init.DB.Where("port = ?", port).First(&sshport).Error
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("查询 ssh_port 表失败：%v", err)})
+			return
+		}
+		sshport.Hostname = hostname
+    sshport.IsUsed = true
+		err = m_init.DB.Save(&sshport).Error
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("更新 ssh_port 表失败：%v", err)})
+		  return
+		}
 	}
 
 	tmpl, err := template.New("ssh").Parse(sshTunnelTemplate)
@@ -757,32 +768,44 @@ func GetCombinedScript(c *gin.Context) {
 		return
 	}
 
+	var sshport u.SSHPort
+	var port int
+	var err error
+
+	// 先尝试查找是否有已分配给该 hostname 的端口记录
+	err = m_init.DB.Where("hostname = ?", hostname).First(&sshport).Error
+	if err == nil {
+		// 已存在记录，使用现有端口
+		port = sshport.Port
+	} else {
+		// 不存在，获取一个新端口并更新记录
+		port, err = pt.GetUnusedPort()
+		if port == -1 {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"message": fmt.Sprintf("获取 SSH 隧道端口失败: %v", err.Error)})
+			return
+		}
+
+		// 修改ssh_port表中port对应记录的hostname
+		var sshport u.SSHPort
+		err = m_init.DB.Where("port = ?", port).First(&sshport).Error
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("查询 ssh_port 表失败：%v", err)})
+			return
+		}
+		sshport.Hostname = hostname
+    sshport.IsUsed = true
+		err = m_init.DB.Save(&sshport).Error
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("更新 ssh_port 表失败：%v", err)})
+		  return
+		}
+	}
+
 	// 查询token
 	var hostandtoken u.HostAndToken
-	err := m_init.DB.Where("host_name = ?", hostname).First(&hostandtoken).Error
+	err = m_init.DB.Where("host_name = ?", hostname).First(&hostandtoken).Error
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, "查询hostandtoken表失败："+err.Error())
-		return
-	}
-
-	port, err := pt.GetUnusedPort()
-	if port == -1 {
-		c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"message": "获取脚本失败：" + err.Error()})
-		return
-	}
-
-	// 修改ssh_port表中port对应记录的hostname
-	var sshport u.SSHPort
-	err = m_init.DB.Where("port = ?", port).First(&sshport).Error
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "查询ssh_port表失败：" + err.Error()})
-		return
-	}
-	sshport.Hostname = hostname
-	sshport.IsUsed = true
-	err = m_init.DB.Save(&sshport).Error
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "更新ssh_port表失败：" + err.Error()})
 		return
 	}
 
@@ -825,21 +848,34 @@ func GenerateCombinedScriptBytes(hostname, token string) ([]byte, error) {
 		return nil, fmt.Errorf("公共服务器 IP 或隧道用户名未配置")
 	}
 
-	port, err := pt.GetUnusedPort()
-	if port == -1 {
-		return nil, fmt.Errorf("获取 SSH 隧道端口失败: %v", err)
-	}
-
-	// 修改ssh_port表中port对应记录的hostname
 	var sshport u.SSHPort
-	err = m_init.DB.Where("port = ?", port).First(&sshport).Error
-	if err != nil {
-		return nil, fmt.Errorf("查询ssh_port表失败：%v", err)
-	}
-	sshport.Hostname = hostname
-	err = m_init.DB.Save(&sshport).Error
-	if err != nil {
-		return nil, fmt.Errorf("更新ssh_port表失败：%v", err)
+	var port int
+	var err error
+	// 先尝试查找是否有已分配给该 hostname 的端口记录
+	err = m_init.DB.Where("hostname = ?", hostname).First(&sshport).Error
+
+	if err == nil {
+		// 已存在记录，使用现有端口
+		port = sshport.Port
+	} else {
+		// 不存在，获取一个新端口并更新记录
+		port, err = pt.GetUnusedPort()
+		if port == -1 {
+			return nil, fmt.Errorf("获取 SSH 隧道端口失败: %v", err)
+		}
+
+		// 修改ssh_port表中port对应记录的hostname
+		var sshport u.SSHPort
+		err = m_init.DB.Where("port = ?", port).First(&sshport).Error
+		if err != nil {
+			return nil, fmt.Errorf("查询ssh_port表失败：%v", err)
+		}
+		sshport.Hostname = hostname
+    sshport.IsUsed = true
+		err = m_init.DB.Save(&sshport).Error
+		if err != nil {
+			return nil, fmt.Errorf("更新ssh_port表失败：%v", err)
+		}
 	}
 
 	// 解析模板
