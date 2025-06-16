@@ -1069,10 +1069,11 @@ set -e
 AGENT_DIR="/opt/monitor"
 SERVICE_NAME="monitor_agent"
 SSH_TUNNEL_SERVICE_PREFIX="reversetunnel"
+PORT="{{ .Port }}"
 
 # 日志记录
 exec > >(tee -a /tmp/uninstall_combined_monitor_$(date +%Y%m%d).log) 2>&1
-echo "[*] 开始卸载 $SERVICE_NAME 和所有 ${SSH_TUNNEL_SERVICE_PREFIX}@* 服务..."
+echo "[*] 开始卸载 $SERVICE_NAME 和 reversetunnel@${PORT} 服务..."
 
 # 判断是否使用 sudo
 if command -v sudo &> /dev/null; then
@@ -1082,7 +1083,7 @@ else
 fi
 
 # 用户确认
-read -p "[?] 确定要删除 $SERVICE_NAME 服务及所有反向隧道服务吗？(y/N): " confirm
+read -p "[?] 确定要删除 $SERVICE_NAME 服务及 reversetunnel@${PORT} 吗？(y/N): " confirm
 case "$confirm" in
     y|Y|yes|Yes|YES)
         echo "[*] 用户选择继续..."
@@ -1132,38 +1133,37 @@ else
 fi
 
 # ================================
-# 2. 卸载所有 reversetunnel@xxx 服务
+# 2. 卸载 reversetunnel@${PORT} 服务
 # ================================
 
-# 获取所有 reversetunnel@*.service 实例
-TUNNEL_SERVICES=$(systemctl list-units --type=service --all | grep -E "${SSH_TUNNEL_SERVICE_PREFIX}@[0-9]+\.service" | awk '{print $1}')
+TUNNEL_SERVICE="${SSH_TUNNEL_SERVICE_PREFIX}@${PORT}.service"
 
-if [ -n "$TUNNEL_SERVICES" ]; then
-    for TUNNEL_SERVICE in $TUNNEL_SERVICES; do
-        echo "[-] 正在处理服务: $TUNNEL_SERVICE"
+if systemctl list-units --type=service --all | grep -q "${TUNNEL_SERVICE}"; then
+    echo "[-] 正在处理服务: ${TUNNEL_SERVICE}"
 
-        if systemctl is-active --quiet "$TUNNEL_SERVICE"; then
-            echo "    正在停止 $TUNNEL_SERVICE..."
-            ${SUDO}systemctl stop "$TUNNEL_SERVICE"
-        fi
+    if systemctl is-active --quiet "${TUNNEL_SERVICE}"; then
+        echo "    正在停止 ${TUNNEL_SERVICE}..."
+        ${SUDO}systemctl stop "${TUNNEL_SERVICE}"
+    fi
 
-        if systemctl is-enabled --quiet "$TUNNEL_SERVICE"; then
-            echo "    正在禁用 $TUNNEL_SERVICE..."
-            ${SUDO}systemctl disable "$TUNNEL_SERVICE"
-        fi
+    if systemctl is-enabled --quiet "${TUNNEL_SERVICE}"; then
+        echo "    正在禁用 ${TUNNEL_SERVICE}..."
+        ${SUDO}systemctl disable "${TUNNEL_SERVICE}"
+    fi
 
-        SERVICE_FILE="/etc/systemd/system/${TUNNEL_SERVICE}"
-        if [ -f "$SERVICE_FILE" ]; then
-            echo "    正在删除 $SERVICE_FILE..."
-            ${SUDO}rm -f "$SERVICE_FILE"
-        fi
-    done
+    SERVICE_FILE="/etc/systemd/system/${TUNNEL_SERVICE}"
+    if [ -f "$SERVICE_FILE" ]; then
+        echo "    正在删除 $SERVICE_FILE..."
+        ${SUDO}rm -f "$SERVICE_FILE"
+    fi
+else
+    echo "[*] 服务 ${TUNNEL_SERVICE}.service 不存在，跳过卸载。"
 fi
 
 # 重载 systemd
 ${SUDO}systemctl daemon-reload
 
-echo "[+] 所有服务已成功卸载！"
+echo "[+] 所有指定服务已成功卸载！"
 `
 
 // GetUninstallScript 返回一个可下载的卸载脚本，用于删除 monitor_agent 和 reversetunnel 服务

@@ -80,13 +80,15 @@ func TransferBetweenTwoServers(c *gin.Context) {
 		return
 	}
 
+	var detail = fmt.Sprintf("源服务器：%s，源文件：%s，目的服务器：%s，目标文件：%s。", request.SourceServer, request.SourcePath, request.TargetServer, request.TargetPath)
+
 	flag, err := CheckServerBelongs(Username.(string), request.SourceServer)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("查询源服务器是否属于用户（所在公司）失败: %v", err.Error())})
 		return
 	}
 	if !flag {
-		logs.Sugar.Errorw("两服务器间单文件传输", "username", username, "detail", "该源服务器不属于用户（所在公司）")
+		logs.Sugar.Errorw("两服务器间单文件传输", "username", username, "detail", "该源服务器不属于用户（所在公司）。"+detail)
 		c.JSON(http.StatusForbidden, gin.H{"message": "该源服务器不属于用户（所在公司）"})
 		return
 	}
@@ -96,7 +98,7 @@ func TransferBetweenTwoServers(c *gin.Context) {
 		return
 	}
 	if !flag {
-		logs.Sugar.Errorw("两服务器间单文件传输", "username", username, "detail", "该目标服务器不属于用户（所在公司）")
+		logs.Sugar.Errorw("两服务器间单文件传输", "username", username, "detail", "该目标服务器不属于用户（所在公司）。" + detail)
 		c.JSON(http.StatusForbidden, gin.H{"message": "该目标服务器不属于用户（所在公司）"})
 		return
 	}
@@ -111,7 +113,7 @@ func TransferBetweenTwoServers(c *gin.Context) {
 		err = trans.CreateConnectionToPool(g.Pool, request.SourceServer, request.SourceUser, request.SourceAuth)
 		if err != nil {
 			log.Printf("创建与源服务器的连接失败: %v", err)
-			logs.Sugar.Errorw("两服务器间单文件传输", "username", username, "detail", "创建与源服务器的连接失败，请检查源服务器是否正确")
+			logs.Sugar.Errorw("两服务器间单文件传输", "username", username, "detail", "创建与源服务器的连接失败，请检查源服务器是否正确。"+detail)
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("创建与源服务器的连接失败: %v", err)})
 			return
 		}
@@ -122,7 +124,7 @@ func TransferBetweenTwoServers(c *gin.Context) {
 		err = trans.CreateConnectionToPool(g.Pool, request.TargetServer, request.TargetUser, request.TargetAuth)
 		if err != nil {
 			log.Printf("创建与目标服务器的连接失败: %v", err)
-			logs.Sugar.Errorw("两服务器间单文件传输", "username", username, "detail", "创建与目标服务器的连接失败，请检查目标服务器是否正确")
+			logs.Sugar.Errorw("两服务器间单文件传输", "username", username, "detail", "创建与目标服务器的连接失败，请检查目标服务器是否正确。"+detail)
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("创建与目标服务器的连接失败: %v", err)})
 			return
 		}
@@ -137,13 +139,13 @@ func TransferBetweenTwoServers(c *gin.Context) {
 	)
 	if err != nil {
 		log.Printf("文件传输失败: %v；文件传输任务ID：%s", err, taskID)
-		logs.Sugar.Errorw("两服务器间单文件传输", "username", username, "detail", "文件传输失败，请确认文件路径是否正确")
+		logs.Sugar.Errorw("两服务器间单文件传输", "username", username, "detail", "文件传输失败，请确认文件路径是否正确。"+detail)
 		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("文件传输失败: %v", err), "task_id": taskID})
 		return
 	}
 
 	log.Printf("文件传输成功，任务ID: %s\n", taskID)
-	logs.Sugar.Infow("两服务器间单文件传输", "username", username, "detail", "文件传输成功，任务ID: "+taskID)
+	logs.Sugar.Infow("两服务器间单文件传输", "username", username, "detail", "两服务器间单文件传输成功。"+detail)
 	c.JSON(http.StatusOK, gin.H{"message": "文件传输完成", "task_id": taskID})
 }
 
@@ -163,6 +165,8 @@ func CommonUpload(c *gin.Context) {
 		return
 	}
 
+	var detail = fmt.Sprintf("服务器：%s，服务器文件路径：%s。", request.Server, request.Path)
+
 	// 检查服务器是否属于用户所在的公司或是否是用户自己的服务器
 	flag, err := CheckServerBelongs(username, request.Server)
 	if err != nil {
@@ -170,7 +174,7 @@ func CommonUpload(c *gin.Context) {
 		return
 	}
 	if !flag {
-		logs.Sugar.Errorw("文件上传", "username", username, "detail", "该服务器不属于用户（所在公司）")
+		logs.Sugar.Errorw("文件上传", "username", username, "detail", "该服务器不属于用户（所在公司）。"+detail)
 		c.JSON(http.StatusForbidden, gin.H{"message": "该服务器不属于用户（所在公司）"})
 		return
 	}
@@ -188,7 +192,7 @@ func CommonUpload(c *gin.Context) {
 		err = trans.CreateConnectionToPool(g.Pool, request.Server, request.User, request.Auth)
 		if err != nil {
 			log.Printf("创建与目标服务器的连接失败: %v", err)
-			logs.Sugar.Errorw("文件上传", "username", username, "detail", "创建与目标服务器的连接失败，请检查目标服务器是否正确")
+			logs.Sugar.Errorw("文件上传", "username", username, "detail", "创建与目标服务器的连接失败，请检查目标服务器是否正确。"+detail)
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("创建与目标服务器的连接失败: %v", err)})
 			return
 		}
@@ -202,13 +206,13 @@ func CommonUpload(c *gin.Context) {
 	)
 	if err != nil {
 		log.Printf("文件上传失败: %v", err)
-		logs.Sugar.Errorw("文件上传", "username", username, "detail", "文件上传失败，请检查文件路径是否正确")
+		logs.Sugar.Errorw("文件上传", "username", username, "detail", "文件上传失败，请检查文件路径是否正确。"+detail)
 		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("文件上传失败: %v", err), "task_id": taskID})
 		return
 	}
 
 	log.Printf("文件上传任务已完成，任务ID: %s\n", taskID)
-	logs.Sugar.Infow("文件上传", "username", username, "detail", "文件上传成功，任务ID: "+taskID)
+	logs.Sugar.Infow("文件上传", "username", username, "detail", "文件上传成功。"+detail)
 	c.JSON(http.StatusOK, gin.H{"message": "文件上传完成", "task_id": taskID})
 }
 
@@ -228,13 +232,15 @@ func CommonDownload(c *gin.Context) {
 		return
 	}
 
+	var detail = fmt.Sprintf("服务器：%s，文件：%s。", request.Server, request.Path)
+
 	flag, err := CheckServerBelongs(Username.(string), request.Server)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("查询服务器是否属于用户（所在公司）失败: %v", err)})
 		return
 	}
 	if !flag {
-		logs.Sugar.Errorw("文件下载", "username", username, "detail", "该服务器不属于用户（所在公司）")
+		logs.Sugar.Errorw("文件下载", "username", username, "detail", "该服务器不属于用户（所在公司）。"+detail)
 		c.JSON(http.StatusForbidden, gin.H{"message": "该服务器不属于用户（所在公司）"})
 		return
 	}
@@ -244,13 +250,13 @@ func CommonDownload(c *gin.Context) {
 		err = trans.CreateConnectionToPool(g.Pool, request.Server, request.User, request.Auth)
 		if err != nil {
 			log.Printf("创建与目标服务器的连接失败: %v", err)
-			logs.Sugar.Errorw("文件下载", "username", username, "detail", "创建与目标服务器的连接失败，请检查目标服务器是否正确")
+			logs.Sugar.Errorw("文件下载", "username", username, "detail", "创建与目标服务器的连接失败，请检查目标服务器是否正确。"+detail)
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("创建与目标服务器的连接失败: %v", err)})
 			return
 		}
 	}
 	// 执行文件传输任务
-	sftpClient, task_id, err := g.FTS.CreateCommonDownloadTask(
+	sftpClient, _, err := g.FTS.CreateCommonDownloadTask(
 		request.Server,
 		request.Path,
 	)
@@ -265,7 +271,7 @@ func CommonDownload(c *gin.Context) {
 	file, err := sftpClient.Open(request.Path) // 打开远程文件
 	if err != nil {
 		log.Printf("远程文件打开失败: %v", err)
-		logs.Sugar.Errorw("文件下载", "username", username, "detail", "远程文件打开失败，请检查文件路径是否正确")
+		logs.Sugar.Errorw("文件下载", "username", username, "detail", "远程文件打开失败，请检查文件路径是否正确。"+detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("远程文件打开失败: %v", err)})
 		return
 	}
@@ -275,13 +281,13 @@ func CommonDownload(c *gin.Context) {
 	stat, err := file.Stat() // 获取文件信息，包括大小等
 	if err != nil {
 		log.Printf("文件不存在: %v", err)
-		logs.Sugar.Errorw("文件下载", "username", username, "detail", "文件不存在")
+		logs.Sugar.Errorw("文件下载", "username", username, "detail", "文件不存在。"+detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("文件不存在: %v", err)})
 		return
 	}
 	if stat.IsDir() {
 		log.Printf("路径是一个目录: %v", err)
-		logs.Sugar.Errorw("文件下载", "username", username, "detail", "路径是一个目录")
+		logs.Sugar.Errorw("文件下载", "username", username, "detail", "路径是一个目录。"+detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("路径是一个目录: %v", err)})
 		return
 	}
@@ -310,10 +316,10 @@ func CommonDownload(c *gin.Context) {
 			return
 		}
 		log.Printf("文件写入响应失败: %v", err)
-		logs.Sugar.Errorw("文件下载", "username", username, "detail", "文件写入响应失败，请检查网络连接是否正常")
+		logs.Sugar.Errorw("文件下载", "username", username, "detail", "文件写入响应失败，请检查网络连接是否正常。"+detail)
 		return
 	}
 	c.Writer.Flush()
 	log.Printf("文件下载成功")
-	logs.Sugar.Infow("文件下载", "username", username, "detail", "文件下载成功，任务ID: "+task_id)
+	logs.Sugar.Infow("文件下载", "username", username, "detail", "文件下载成功。"+detail)
 }
