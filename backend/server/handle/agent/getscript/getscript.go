@@ -153,6 +153,7 @@ set -e
 PUBLIC_SERVER_IP="{{ .PublicServerIP }}"
 SSH_TUNNEL_PORT={{ .Port }}
 SSH_TUNNEL_USER="{{ .SshTunnelUsername }}"
+SSH_TUNNEL_PASS="{{ .SshTunnelPassword }}"
 
 # 安装 autossh
 detect_os() {
@@ -246,6 +247,28 @@ else
   esac
 fi
 
+# 安装 sshpass（如果还没有安装）
+if ! command -v sshpass &> /dev/null; then
+  case "$OS" in
+    ubuntu|debian)
+      ${SUDO} apt install -y sshpass
+      ;;
+    centos|rhel)
+      ${SUDO} yum install -y sshpass
+      ;;
+    fedora)
+      ${SUDO} dnf install -y sshpass
+      ;;
+    alpine)
+      su root -c "apk add --no-cache sshpass"
+      ;;
+    *)
+      echo "不支持的操作系统: $OS, 或者无法安装 sshpass"
+      exit 1
+      ;;
+  esac
+fi
+
 # 创建 systemd 服务文件
 cat > /tmp/${SERVICE_NAME}.service <<EOF
 [Unit]
@@ -254,7 +277,7 @@ After=network.target
 
 [Service]
 User=$(whoami)
-ExecStart=/usr/bin/autossh -M 0 -N -o "StrictHostKeyChecking=no" -R %i:localhost:22 ${SSH_TUNNEL_USER}@${PUBLIC_SERVER_IP}
+ExecStart=/usr/bin/sshpass -p '${SSH_TUNNEL_PASS}' /usr/bin/autossh -M 0 -N -o "StrictHostKeyChecking=no" -R %i:localhost:22 ${SSH_TUNNEL_USER}@${PUBLIC_SERVER_IP}
 Restart=always
 RestartSec=5
 
@@ -351,7 +374,7 @@ func GetSSHScript(c *gin.Context) {
 		return
 	}
 	sshport.Hostname = hostname
-  sshport.IsUsed = true
+	sshport.IsUsed = true
 	err = m_init.DB.Save(&sshport).Error
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "更新ssh_port表失败：" + err.Error()})
@@ -369,10 +392,12 @@ func GetSSHScript(c *gin.Context) {
 	data := struct {
 		PublicServerIP    string
 		SshTunnelUsername string
+		SshTunnelPassword string
 		Port              int
 	}{
 		PublicServerIP:    cf.PublicServerIP,
 		SshTunnelUsername: cf.SshTunnelUsername,
+		SshTunnelPassword: cf.SshTunnelPassword,
 		Port:              port,
 	}
 
@@ -517,11 +542,14 @@ ${SUDO}  systemctl status monitor_agent.service
 
 echo "[+] Agent 安装完成！已启动 monitor_agent.service 服务"
 
+
+
 # 第二部分：配置反向SSH隧道
 
 PUBLIC_SERVER_IP="{{ .PublicServerIP }}"
 SSH_TUNNEL_PORT={{ .Port }}
 SSH_TUNNEL_USER="{{ .SshTunnelUsername }}"
+SSH_TUNNEL_PASS="{{ .SshTunnelPassword }}"
 
 # 安装 autossh
 detect_os() {
@@ -615,6 +643,28 @@ else
   esac
 fi
 
+# 安装 sshpass（如果还没有安装）
+if ! command -v sshpass &> /dev/null; then
+  case "$OS" in
+    ubuntu|debian)
+      ${SUDO} apt install -y sshpass
+      ;;
+    centos|rhel)
+      ${SUDO} yum install -y sshpass
+      ;;
+    fedora)
+      ${SUDO} dnf install -y sshpass
+      ;;
+    alpine)
+      su root -c "apk add --no-cache sshpass"
+      ;;
+    *)
+      echo "不支持的操作系统: $OS, 或者无法安装 sshpass"
+      exit 1
+      ;;
+  esac
+fi
+
 # 创建 systemd 服务文件
 cat > /tmp/${SERVICE_NAME}.service <<EOF
 [Unit]
@@ -623,7 +673,7 @@ After=network.target
 
 [Service]
 User=$(whoami)
-ExecStart=/usr/bin/autossh -M 0 -N -o "StrictHostKeyChecking=no" -R %i:localhost:22 ${SSH_TUNNEL_USER}@${PUBLIC_SERVER_IP}
+ExecStart=/usr/bin/sshpass -p '${SSH_TUNNEL_PASS}' /usr/bin/autossh -M 0 -N -o "StrictHostKeyChecking=no" -R %i:localhost:22 ${SSH_TUNNEL_USER}@${PUBLIC_SERVER_IP}
 Restart=always
 RestartSec=5
 
@@ -672,7 +722,7 @@ func GetCombinedScript(c *gin.Context) {
 		return
 	}
 	sshport.Hostname = hostname
-  sshport.IsUsed = true
+	sshport.IsUsed = true
 	err = m_init.DB.Save(&sshport).Error
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "更新ssh_port表失败：" + err.Error()})
@@ -694,10 +744,12 @@ func GetCombinedScript(c *gin.Context) {
 		HostName          string
 		Token             string
 		SshTunnelUsername string
+		SshTunnelPassword string
 		Port              int
 	}{
 		GithubRepoUrl:     cf.GithubRepoUrl,
 		PublicServerIP:    cf.PublicServerIP,
+		SshTunnelPassword: cf.SshTunnelPassword,
 		HostName:          hostname,
 		Token:             hostandtoken.Token,
 		SshTunnelUsername: cf.SshTunnelUsername,
