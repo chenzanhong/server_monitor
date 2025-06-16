@@ -107,6 +107,29 @@ case "$OS" in
     ;;
 esac
 
+# 确保 AGENT_DIR 是干净的（如果存在）
+if [ -d "$AGENT_DIR" ]; then
+    echo "[!] 检测到代理目录已存在：$AGENT_DIR"
+    read -p "是否删除该目录以继续安装？(y/N): " CONFIRM_DELETE
+
+    case "$CONFIRM_DELETE" in
+        y|Y|yes|Yes|YES)
+            echo "[*] 用户选择删除目录: $AGENT_DIR"
+            ${SUDO} rm -rf "$AGENT_DIR"
+            if [ $? -eq 0 ]; then
+                echo "[+] 成功删除目录: $AGENT_DIR"
+            else
+                echo "[!] 删除目录失败，请检查权限或路径"
+                exit 1
+            fi
+            ;;
+        *)
+            echo "[*] 用户取消操作，退出安装脚本。"
+            exit 0
+            ;;
+    esac
+fi
+
 mkdir -p "$AGENT_DIR"
 cd "$AGENT_DIR" || { echo "无法创建或进入目录 $AGENT_DIR"; exit 1; }
 
@@ -480,6 +503,17 @@ if $SERVICE_EXISTS; then
         ${SUDO} rm /etc/systemd/system/monitor_agent.service || { echo "无法删除旧的服务文件"; exit 1; }
     fi
 
+    # 删除 AGENT_DIR（如果存在）
+    if [ -d "$AGENT_DIR" ]; then
+        echo "[*] 正在删除代理目录: $AGENT_DIR"
+        ${SUDO} rm -rf "$AGENT_DIR"
+        if [ $? -eq 0 ]; then
+            echo "[+] 成功删除代理目录: $AGENT_DIR"
+        else
+            echo "[!] 删除代理目录失败，请检查权限或路径"
+        fi
+    fi
+
     ${SUDO} systemctl daemon-reload
 else
     echo "[+] 准备开始安装代理程序。"
@@ -503,6 +537,29 @@ case "$OS" in
     exit 1
     ;;
 esac
+
+# 确保 AGENT_DIR 是干净的（如果存在）
+if [ -d "$AGENT_DIR" ]; then
+    echo "[!] 检测到代理目录已存在：$AGENT_DIR"
+    read -p "是否删除该目录以继续安装？(y/N): " CONFIRM_DELETE
+
+    case "$CONFIRM_DELETE" in
+        y|Y|yes|Yes|YES)
+            echo "[*] 用户选择删除目录: $AGENT_DIR"
+            ${SUDO} rm -rf "$AGENT_DIR"
+            if [ $? -eq 0 ]; then
+                echo "[+] 成功删除目录: $AGENT_DIR"
+            else
+                echo "[!] 删除目录失败，请检查权限或路径"
+                exit 1
+            fi
+            ;;
+        *)
+            echo "[*] 用户取消操作，退出安装脚本。"
+            exit 0
+            ;;
+    esac
+fi
 
 mkdir -p "$AGENT_DIR"
 cd "$AGENT_DIR" || { echo "无法创建或进入目录 $AGENT_DIR"; exit 1; }
