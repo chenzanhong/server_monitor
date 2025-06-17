@@ -1,7 +1,6 @@
 package email
 
 import (
-	"backend/server/handle/email"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -194,11 +193,11 @@ func SendVerificationCode(c *gin.Context) {
 		Email string `json:"email"`
 	}
 
-	if err := c.ShouldBindJSON(&request); err != nil {
+	if err := c.BindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "参数错误"})
 		return
 	}
-	
+
     // 去除前后空格
 	email := strings.TrimSpace(request.Email)
 	if !IsValidEmail(email) {
