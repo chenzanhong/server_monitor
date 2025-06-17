@@ -134,6 +134,7 @@ func main() {
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL("/docs/swagger.json")))
 
 	router.POST("/agent/register", login.Register)
+	router.POST("/registertoken", e.SendVerificationCode) // 注册时发送验证码邮件
 	router.POST("/agent/login", login.Login)
 	router.GET("/defaultagentscript", getscript.GetAgentScript) // 获取安装代理程序的脚本
 
@@ -151,7 +152,7 @@ func main() {
 		auth.POST("/info/manage", info.ManageNotice)      //处理通知状态
 
 		// 系统/公司管理员操作
-		auth.POST("/registercompany", company.Register)       //注册公司
+		auth.POST("/registercompany", company.Register)       // 注册公司
 		auth.POST("/addMember", admin.AddMember)              // 添加成员
 		auth.POST("/deleteMembers", admin.DeleteMember)       // 批量删除成员
 		auth.GET("/getmemberinfo", admin.GetMemberInfo)       // 获取公司成员信息

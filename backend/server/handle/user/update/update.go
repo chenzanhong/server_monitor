@@ -67,7 +67,7 @@ func UpdateUserInfo(c *gin.Context) {
 
 	// 获取当前用户信息
 
-	var detail = fmt.Sprintf("新密码:%s, 新邮箱:%s, 真实姓名:%s",request.NewPassword, request.Email, request.RealName)
+	var detail = fmt.Sprintf("新密码:%s, 新邮箱:%s, 真实姓名:%s", request.NewPassword, request.Email, request.RealName)
 
 	var user u.User
 	if err := m_init.DB.Where("name =?", username).First(&user).Error; err != nil {
@@ -82,7 +82,7 @@ func UpdateUserInfo(c *gin.Context) {
 		// 执行密码更新操作
 		if err := m_init.DB.Model(&u.User{}).Where("name =?", username).Updates(map[string]interface{}{"password": request.NewPassword}).Error; err != nil {
 			log.Printf("更新密码失败")
-			logs.Sugar.Errorw("修改个人信息", "username", username, "detail", "更新密码失败。"+ detail)
+			logs.Sugar.Errorw("修改个人信息", "username", username, "detail", "更新密码失败。"+detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新密码失败", "error": err.Error()})
 			return
 		}
@@ -93,7 +93,7 @@ func UpdateUserInfo(c *gin.Context) {
 		// 执行邮箱更新操作
 		if err := m_init.DB.Model(&u.User{}).Where("name =?", username).Updates(map[string]interface{}{"email": request.Email}).Error; err != nil {
 			log.Printf("更新邮箱失败")
-			logs.Sugar.Errorw("修改个人信息", "username", username, "detail", "更新邮箱失败。"+ detail)
+			logs.Sugar.Errorw("修改个人信息", "username", username, "detail", "更新邮箱失败。"+detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新邮箱失败", "error": err.Error()})
 			return
 		}
@@ -104,20 +104,20 @@ func UpdateUserInfo(c *gin.Context) {
 		// 执行真实姓名更新操作
 		if err := m_init.DB.Model(&u.User{}).Where("name =?", username).Updates(map[string]interface{}{"realname": request.RealName}).Error; err != nil {
 			log.Printf("更新真实姓名失败")
-			logs.Sugar.Errorw("修改个人信息", "username", username, "detail", "更新真实姓名失败。"+ detail)
+			logs.Sugar.Errorw("修改个人信息", "username", username, "detail", "更新真实姓名失败。"+detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新真实姓名失败", "error": err.Error()})
 			return
 		}
 	}
 
-	logs.Sugar.Infow("修改个人信息", "username", username, "detail", "修改个人信息成功。"+ detail)
+	logs.Sugar.Infow("修改个人信息", "username", username, "detail", "修改个人信息成功。"+detail)
 	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
 }
 
 // 密码找回：-----------------------------------
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-func generateRandomToken(length int) string {
+func GenerateRandomToken(length int) string {
 	source := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(source)
 	token := make([]byte, length)
@@ -150,11 +150,11 @@ func RequestResetPassword(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Printf("用户未找到")
-			logs.Sugar.Errorw("重置密码请求", "detail", "用户未找到。"+ detail)
+			logs.Sugar.Errorw("重置密码请求", "detail", "用户未找到。"+detail)
 			c.JSON(http.StatusNotFound, gin.H{"message": "用户未找到"})
 		} else {
 			log.Printf("数据库查询失败")
-			logs.Sugar.Errorw("重置密码请求", "detail", "数据库查询失败。"+ detail)
+			logs.Sugar.Errorw("重置密码请求", "detail", "数据库查询失败。"+detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询失败"})
 		}
 		return
@@ -162,13 +162,13 @@ func RequestResetPassword(c *gin.Context) {
 
 	// 生成唯一的重置密码 token
 	// token := fmt.Sprintf("%d", time.Now().UnixNano())
-	token := generateRandomToken(6) // 生成6位长度的token
+	token := GenerateRandomToken(6) // 生成6位长度的token
 	fmt.Println("密码找回时生成的token为：", token)
 	// 在数据库中保存 token
 	err = m_init.DB.Model(&user).Update("token", token).Error
 	if err != nil {
 		log.Printf("保存 token 失败")
-		logs.Sugar.Errorw("重置密码请求", "detail","保存 token 失败。"+ detail)
+		logs.Sugar.Errorw("重置密码请求", "detail", "保存 token 失败。"+detail)
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "保存 token 失败"})
 		return
 	}
@@ -177,12 +177,12 @@ func RequestResetPassword(c *gin.Context) {
 	err = e.SendResetPasswordEmail(request.Email, token)
 	if err != nil {
 		log.Printf("发送重置密码邮件失败")
-		logs.Sugar.Errorw("重置密码请求", "detail", "发送重置密码邮件失败。"+ detail)
+		logs.Sugar.Errorw("重置密码请求", "detail", "发送重置密码邮件失败。"+detail)
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "发送重置密码邮件失败"})
 		return
 	}
 
-	logs.Sugar.Infow("重置密码请求", "detail", "重置密码请求成功。"+ detail)
+	logs.Sugar.Infow("重置密码请求", "detail", "重置密码请求成功。"+detail)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "重置密码请求成功",
 	})
@@ -212,11 +212,11 @@ func ResetPassword(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Printf("无效的重置密码 token")
-			logs.Sugar.Errorw("重置密码", "detail","无效的重置密码 token。"+ detail)
+			logs.Sugar.Errorw("重置密码", "detail", "无效的重置密码 token。"+detail)
 			c.JSON(http.StatusNotFound, gin.H{"message": "无效的重置密码 token"})
 		} else {
 			log.Printf("数据库查询失败")
-			logs.Sugar.Errorw("重置密码", "detail", "数据库查询失败。"+ detail)
+			logs.Sugar.Errorw("重置密码", "detail", "数据库查询失败。"+detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询失败"})
 		}
 		return
@@ -225,7 +225,7 @@ func ResetPassword(c *gin.Context) {
 	err = m_init.DB.Model(&user).Update("password", request.NewPassword).Error
 	if err != nil {
 		log.Printf("密码重置失败")
-		logs.Sugar.Errorw("重置密码", "detail", "密码重置失败。"+ detail)
+		logs.Sugar.Errorw("重置密码", "detail", "密码重置失败。"+detail)
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "密码重置失败"})
 		return
 	}
@@ -233,12 +233,12 @@ func ResetPassword(c *gin.Context) {
 	err = m_init.DB.Model(&user).Update("token", nil).Error
 	if err != nil {
 		log.Printf("密码重置成功，但是 token 重置失败")
-		logs.Sugar.Errorw("重置密码", "detail", "密码重置成功，但是 token 重置失败。"+ detail)
+		logs.Sugar.Errorw("重置密码", "detail", "密码重置成功，但是 token 重置失败。"+detail)
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "密码重置成功，但是 token 重置失败"})
 		return
 	}
 
-	logs.Sugar.Infow("重置密码", "detail", "重置密码成功。"+ detail)
+	logs.Sugar.Infow("重置密码", "detail", "重置密码成功。"+detail)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "重置密码成功",
 	})
