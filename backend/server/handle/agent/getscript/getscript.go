@@ -943,8 +943,6 @@ const deleteMonitorAgentScriptTemplate = `#!/bin/bash
 set -e
 
 # 从参数中继承
-HOSTNAME="{{ .HostName }}"
-TOKEN="{{ .Token }}"
 AGENT_DIR="/opt/monitor"
 SERVICE_NAME="monitor_agent"
 
@@ -1021,44 +1019,27 @@ echo "[+] $SERVICE_NAME 已成功卸载！"
 func GetAgentUninstallScript(c *gin.Context) {
 	hostname := c.Query("hostname")
 	if hostname == "" {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "hostname参数不能为空"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "Query参数hostname不能为空"})
 		return
 	}
 
-	// 查询 hostandtoken 表获取 Token
-	var hostandtoken u.HostAndToken
-	err := m_init.DB.Where("host_name = ?", hostname).First(&hostandtoken).Error
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "查询 hostandtoken 表失败: " + err.Error()})
-		return
-	}
-
-	// 使用模板生成卸载脚本
-	tmpl, err := template.New("delete_monitor").Parse(deleteMonitorAgentScriptTemplate)
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
+  // 判断hostname是否存在，如果不存在则不返回
+  var hostinfo u.HostInfo
+  err := m_init.DB.Where("hostname = ?", hostname).First(&hostinfo).Error
+  if err != nil {
+    c.JSON(http.StatusInternalServerError, gin.H{"message": "查询 host_info 表失败: " + err.Error()})
+    return
+  }
 
 	// 设置响应头为文件下载
 	c.Header("Content-Type", "application/octet-stream")
 	c.Header("Content-Disposition", "attachment; filename=uninstall_monitor_agent.sh")
 
-	// 数据填充
-	data := struct {
-		HostName      string
-		Token         string
-		GithubRepoUrl string
-	}{
-		HostName:      hostname,
-		Token:         hostandtoken.Token,
-		GithubRepoUrl: cf.GithubRepoUrl,
-	}
-
-	// 执行模板渲染并写入响应
-	if err := tmpl.Execute(c.Writer, data); err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-	}
+	_, err = c.Writer.Write([]byte(deleteMonitorAgentScriptTemplate))
+  if err != nil {
+    c.AbortWithError(http.StatusInternalServerError, err)
+    return
+  }
 }
 
 const uninstallCombinedScriptTemplate = `#!/bin/bash
@@ -1174,19 +1155,11 @@ func GetCombinedUninstallScript(c *gin.Context) {
 		return
 	}
 
-	// 查询 hostandtoken 表获取 Token
-	var hostandtoken u.HostAndToken
-	err := m_init.DB.Where("host_name = ?", hostname).First(&hostandtoken).Error
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "查询 hostandtoken 表失败: " + err.Error()})
-		return
-	}
-
 	// 查询 ssh_ports 表获取 Port 和 SshTunnelUsername
 	var sshport u.SSHPort
-	err = m_init.DB.Where("hostname = ?", hostname).First(&sshport).Error
+	err := m_init.DB.Where("hostname = ?", hostname).First(&sshport).Error
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "查询 ssh_ports 表失败: " + err.Error()})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "请确认hostname参数值是否正确: " + err.Error()})
 		return
 	}
 
@@ -1203,19 +1176,14 @@ func GetCombinedUninstallScript(c *gin.Context) {
 
 	// 数据填充
 	data := struct {
-		HostName          string
-		Token             string
-		SshTunnelUsername string
+		// HostName          string
+		// Token             string
+		// SshTunnelUsername string
 		Port              int
-		GithubRepoUrl     string
-		PublicServerIP    string
+		// GithubRepoUrl     string
+		// PublicServerIP    string
 	}{
-		HostName:          hostname,
-		Token:             hostandtoken.Token,
-		SshTunnelUsername: cf.SshTunnelUsername,
 		Port:              sshport.Port,
-		GithubRepoUrl:     cf.GithubRepoUrl,
-		PublicServerIP:    cf.PublicServerIP,
 	}
 
 	// 执行模板渲染并写入响应
