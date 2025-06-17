@@ -75,7 +75,7 @@ func HostInfoList(c *gin.Context) {
 				Find(&hosts).Error
 		} else {
 			err = m_init.DB.Table("host_info").
-				Where("user_name = ? AND created_at BETWEEN ? AND ?", username, user.CompanyId, fromTime, toTime).
+				Where("user_name = ? AND created_at BETWEEN ? AND ?", username, fromTime, toTime).
 				Order("created_at DESC"). // 可选排序
 				Find(&hosts).Error
 		}

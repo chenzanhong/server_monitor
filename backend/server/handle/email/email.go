@@ -1,6 +1,7 @@
 package email
 
 import (
+	"backend/server/handle/email"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -189,9 +190,17 @@ func GenerateRandomToken(length int) string {
 
 // 发送验证码
 func SendVerificationCode(c *gin.Context) {
-	email := c.Query("email")
+	var request struct {
+		Email string `json:"email"`
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "参数错误"})
+		return
+	}
+	
     // 去除前后空格
-    email = strings.TrimSpace(email)
+	email := strings.TrimSpace(request.Email)
 	if !IsValidEmail(email) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "邮箱格式不正确"})
 		return
@@ -223,5 +232,5 @@ func SendVerificationCode(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "验证码已发送，请查收邮箱。"})
+	c.JSON(http.StatusOK, gin.H{"message": "验证码已发送"})
 }
