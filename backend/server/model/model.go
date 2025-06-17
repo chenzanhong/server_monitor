@@ -196,10 +196,10 @@ func InsertHostInfoTx(tx *sql.Tx, hostInfo HostInfo, username string) error {
 	} else {
 		// 插入新的主机记录
 		insertSQL := `
-        INSERT INTO host_info (host_name, ip, os, platform, kernel_arch, created_at, user_name,company_id)
-        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6, $7)
+        INSERT INTO host_info (host_name, ip, os, platform, kernel_arch, created_at, user_name,company_id, cpu_threshold, mem_threshold)
+        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6, $7, $8, $9)
         RETURNING id, host_name`
-		err = tx.QueryRow(insertSQL, hostInfo.Hostname, hostInfo.IP, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch, username, hostInfo.CompanyID).Scan(&hostInfoID, &hostname)
+		err = tx.QueryRow(insertSQL, hostInfo.Hostname, hostInfo.IP, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch, username, hostInfo.CompanyID, hostInfo.CPUThreshold, hostInfo.MemThreshold).Scan(&hostInfoID, &hostname)
 		if err != nil {
 			fmt.Printf("Failed to insert host_info: %v\n", err)
 			return err
