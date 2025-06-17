@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS ssh_keys (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ssh_port表，用于生成配置反向ssh的脚本
+-- ssh_ports表，用于生成配置反向ssh的脚本
 CREATE TABLE IF NOT EXISTS ssh_ports (
 	id SERIAL PRIMARY KEY,
     port INT,

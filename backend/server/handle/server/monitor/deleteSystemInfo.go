@@ -61,7 +61,7 @@ func DeleteSystemInfo(c *gin.Context) {
 	err = tx.Raw(query, deleteSystemInfoRequest.HostName).Scan(&existingID).Error
 	if err != nil {
 		log.Println("数据库查询失败")
-		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "数据库查询失败。"+ detail)
+		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "数据库查询失败。"+detail)
 		tx.Rollback() // 回滚事务
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据库查询失败"})
 		return
@@ -74,14 +74,14 @@ func DeleteSystemInfo(c *gin.Context) {
         `
 		if err = tx.Exec(deleteQuery, deleteSystemInfoRequest.HostName).Error; err != nil {
 			log.Println("删除 hostandtoken 数据失败")
-			logs.Sugar.Errorw("删除服务器", "username", username, "detail", "数据库删除 hostandtoken 数据失败。"+ detail)
+			logs.Sugar.Errorw("删除服务器", "username", username, "detail", "数据库删除 hostandtoken 数据失败。"+detail)
 			tx.Rollback() // 回滚事务
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "删除 hostandtoken 的数据失败"})
 			return
 		}
 	} else {
 		log.Println("数据库没有相应的 hostandtoken 数据")
-		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "数据库没有相应的 hostandtoken 数据。"+ detail)
+		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "数据库没有相应的 hostandtoken 数据。"+detail)
 		tx.Rollback() // 回滚事务
 		c.JSON(http.StatusBadRequest, gin.H{"error": "数据库没有相应的 hostandtoken 数据"})
 		return
@@ -96,7 +96,7 @@ func DeleteSystemInfo(c *gin.Context) {
 	err = tx.Raw(query, deleteSystemInfoRequest.HostName, deleteSystemInfoRequest.IP, username).Scan(&existingID).Error
 	if err != nil {
 		log.Printf("查询 host_info 失败")
-		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "查询 host_info 失败。"+ detail)
+		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "查询 host_info 失败。"+detail)
 		tx.Rollback() // 回滚事务
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询 host_info 失败"})
 		return
@@ -109,52 +109,52 @@ func DeleteSystemInfo(c *gin.Context) {
         `
 		if err = tx.Exec(deleteQuery, deleteSystemInfoRequest.HostName, deleteSystemInfoRequest.IP, username).Error; err != nil {
 			log.Printf("删除 host_info 数据失败")
-			logs.Sugar.Errorw("删除服务器", "username", username, "detail", "数据库删除 host_info 数据失败。"+ detail)
+			logs.Sugar.Errorw("删除服务器", "username", username, "detail", "数据库删除 host_info 数据失败。"+detail)
 			tx.Rollback() // 回滚事务
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "删除 host_info 数据失败"})
 			return
 		}
 	} else {
 		log.Println("数据库没有相应的 host_info 数据")
-		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "数据库没有相应的 host_info 数据。"+ detail)
+		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "数据库没有相应的 host_info 数据。"+detail)
 		tx.Rollback() // 回滚事务
 		c.JSON(http.StatusBadRequest, gin.H{"error": "数据库没有相应的 host_info 数据"})
 		return
 	}
 
-// 更新 ssh_port 表：设置 is_used = false 并清空 hostname
+	// 更新 ssh_ports 表：设置 is_used = false 并清空 hostname
 	updateSSHPortSQL := `
-        UPDATE ssh_port
+        UPDATE ssh_ports
         SET is_used = false, hostname = ''
         WHERE hostname = $1
     `
 	result := tx.Exec(updateSSHPortSQL, deleteSystemInfoRequest.HostName)
 	if result.Error != nil {
-		log.Printf("更新 ssh_port 表失败: %v", result.Error)
-		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "更新 ssh_port 表失败。"+ detail)
+		log.Printf("更新 ssh_ports 表失败: %v", result.Error)
+		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "更新 ssh_ports 表失败。"+detail)
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新 ssh_port 表失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新 ssh_ports 表失败"})
 		return
 	}
 
 	// 可选：检查是否影响了记录
 	if result.RowsAffected == 0 {
-		log.Printf("未找到与 hostname=%s 关联的 ssh_port 记录，跳过更新", deleteSystemInfoRequest.HostName)
-		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "未找到与 hostname="+deleteSystemInfoRequest.HostName+"关联的 ssh_port 记录，跳过更新。"+ detail)
+		log.Printf("未找到与 hostname=%s 关联的 ssh_ports 记录，跳过更新", deleteSystemInfoRequest.HostName)
+		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "未找到与 hostname="+deleteSystemInfoRequest.HostName+"关联的 ssh_ports 记录，跳过更新。"+detail)
 		// 这里可以选择继续提交事务，或者返回警告
 	}
 
 	// 提交事务
 	if err = tx.Commit().Error; err != nil {
 		log.Println("提交事务失败")
-		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "提交事务失败。"+ detail)
+		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "提交事务失败。"+detail)
 		tx.Rollback() // 回滚事务
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "提交事务失败"})
 		return
 	}
 
 	// 成功响应
-	logs.Sugar.Infow("删除服务器", "username", username, "detail", "删除服务器成功。"+ detail)
+	logs.Sugar.Infow("删除服务器", "username", username, "detail", "删除服务器成功。"+detail)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "采集器删除成功",
 	})

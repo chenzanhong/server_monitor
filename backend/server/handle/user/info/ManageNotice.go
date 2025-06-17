@@ -233,7 +233,7 @@ func ManageNotice(c *gin.Context) {
 			return
 		}
 
-		// 获取新公司管理员编号
+		// 获取公司新管理员编号
 		var new_admin_id int
 		query = "select id from users where name = $1"
 		if err := m_init.DB.Raw(query, new_admin).Scan(&new_admin_id).Error; err != nil {

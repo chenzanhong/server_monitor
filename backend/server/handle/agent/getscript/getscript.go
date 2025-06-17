@@ -415,14 +415,14 @@ func GetSSHScript(c *gin.Context) {
 		var sshport u.SSHPort
 		err = m_init.DB.Where("port = ?", port).First(&sshport).Error
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("查询 ssh_port 表失败：%v", err)})
+			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("查询 ssh_ports 表失败：%v", err)})
 			return
 		}
 		sshport.Hostname = hostname
 		sshport.IsUsed = true
 		err = m_init.DB.Save(&sshport).Error
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("更新 ssh_port 表失败：%v", err)})
+			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("更新 ssh_ports 表失败：%v", err)})
 			return
 		}
 	}
@@ -814,14 +814,14 @@ func GetCombinedScript(c *gin.Context) {
 		var sshport u.SSHPort
 		err = m_init.DB.Where("port = ?", port).First(&sshport).Error
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("查询 ssh_port 表失败：%v", err)})
+			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("查询 ssh_ports 表失败：%v", err)})
 			return
 		}
 		sshport.Hostname = hostname
 		sshport.IsUsed = true
 		err = m_init.DB.Save(&sshport).Error
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("更新 ssh_port 表失败：%v", err)})
+			c.JSON(http.StatusInternalServerError, gin.H{"message": fmt.Sprintf("更新 ssh_ports 表失败：%v", err)})
 			return
 		}
 	}
@@ -1182,11 +1182,11 @@ func GetCombinedUninstallScript(c *gin.Context) {
 		return
 	}
 
-	// 查询 ssh_port 表获取 Port 和 SshTunnelUsername
+	// 查询 ssh_ports 表获取 Port 和 SshTunnelUsername
 	var sshport u.SSHPort
 	err = m_init.DB.Where("hostname = ?", hostname).First(&sshport).Error
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "查询 ssh_port 表失败: " + err.Error()})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "查询 ssh_ports 表失败: " + err.Error()})
 		return
 	}
 
