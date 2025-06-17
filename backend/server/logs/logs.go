@@ -136,7 +136,6 @@ func FilterLogs(scanner *bufio.Scanner, logRequest LogRequest, username string) 
 		logTime, err = time.Parse(timeFormat, _log.Timestamp)
 		if err != nil {
 			log.Printf("解析日志时间失败：%v", err)
-			fmt.Println(0)
 			continue
 		}
 
@@ -149,6 +148,11 @@ func FilterLogs(scanner *bufio.Scanner, logRequest LogRequest, username string) 
 		}
 
 		logs = append(logs, _log)
+	}
+
+	// 逆序，确保时间最新的日志放在最前面
+	for i, j := 0, len(logs)-1; i < j; i, j = i+1, j-1 {
+		logs[i], logs[j] = logs[j], logs[i]
 	}
 
 	return logs

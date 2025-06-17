@@ -47,32 +47,12 @@ func UpdateUserInfo(c *gin.Context) {
 		return
 	}
 
-	// 检查新用户名是否已存在
-	// if request.NewName != "" {
-	// 	var existingUser u.User
-	// 	if err := m_init.DB.Where("name = ?", request.NewName).First(&existingUser).Error; err == nil {
-	// 		c.JSON(http.StatusConflict, gin.H{"message": "更新用户名错误：新用户名已存在", "error": err.Error()})
-	// 		return
-	// 	} else if err == gorm.ErrRecordNotFound {
-	// 		// 用户名不存在，执行更新操作
-	// 		if err := m_init.DB.Model(&u.User{}).Where("name =?", username).Updates(map[string]interface{}{"name": request.NewName}).Error; err != nil {
-	// 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新用户名失败", "error": err.Error()})
-	// 			return
-	// 		}
-	// 	} else {
-	// 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询失败"})
-	// 		return
-	// 	}
-	// }
-
-	// 获取当前用户信息
-
-	var detail = fmt.Sprintf("新密码:%s, 新邮箱:%s, 真实姓名:%s", request.NewPassword, request.Email, request.RealName)
+	var detail = fmt.Sprintf("密码:%s, 邮箱:%s, 真实姓名:%s", request.NewPassword, request.Email, request.RealName)
 
 	var user u.User
 	if err := m_init.DB.Where("name =?", username).First(&user).Error; err != nil {
 		log.Printf("未找到用户名")
-		logs.Sugar.Errorw("修改个人信息", "username", username, "detail", "未找到用户名"+detail)
+		logs.Sugar.Errorw("修改个人信息", "username", username, "detail", "未找到用户名。"+detail)
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "获取用户信息失败", "error": err.Error()})
 		return
 	}

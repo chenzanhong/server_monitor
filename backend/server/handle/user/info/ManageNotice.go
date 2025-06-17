@@ -35,17 +35,17 @@ func ManageNotice(c *gin.Context) {
 		return
 	}
 
-	var detail = fmt.Sprintf("通知id:%d,发送者:%s,接收人:%s,内容:%s", requestBody.ID, requestBody.Send ,requestBody.Receive, requestBody.Content)
 
 	// 根据通知id查找对应的通知
 	var notice m_user.Notice
 	err = m_init.DB.Where("id = ?", requestBody.ID).First(&notice).Error
 	if err != nil {
 		log.Println("通知不存在")
-		logs.Sugar.Errorw("通知处理", "username", username, "detail", "通知不存在。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "通知不存在"})
 		return
 	}
+
+	var detail = fmt.Sprintf("发送者:%s,接收人:%s,内容:%s", notice.Send ,notice.Receive, notice.Content)
 
 	if notice.State == "processed" || notice.State == "expired" {
 		log.Println("通知已处理或已过期")
