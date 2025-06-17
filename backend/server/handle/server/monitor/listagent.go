@@ -51,12 +51,12 @@ func HostInfoList(c *gin.Context) {
 		return
 	}
 
-    // 查询用户所在公司
+	// 查询用户所在公司
 	var user u.User
 	err = m_init.DB.Where("name = ?", username).First(&user).Error
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message":"查询用户的公司失败"})
-		return 
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "查询用户的公司失败"})
+		return
 	}
 
 	// 使用 GORM 查询
@@ -68,10 +68,17 @@ func HostInfoList(c *gin.Context) {
 			Find(&hosts).Error
 
 	} else { // 其他用户可见自己的服务器和公司服务器
-		err = m_init.DB.Table("host_info").
-			Where("( user_name = ? OR company_id = ?) AND created_at BETWEEN ? AND ?", username, user.CompanyId, fromTime, toTime).
-			Order("created_at DESC"). // 可选排序
-			Find(&hosts).Error
+		if user.CompanyId != 0 {
+			err = m_init.DB.Table("host_info").
+				Where("( user_name = ? OR company_id = ?) AND created_at BETWEEN ? AND ?", username, user.CompanyId, fromTime, toTime).
+				Order("created_at DESC"). // 可选排序
+				Find(&hosts).Error
+		} else {
+			err = m_init.DB.Table("host_info").
+				Where("user_name = ? AND created_at BETWEEN ? AND ?", username, user.CompanyId, fromTime, toTime).
+				Order("created_at DESC"). // 可选排序
+				Find(&hosts).Error
+		}
 	}
 
 	if err != nil {
