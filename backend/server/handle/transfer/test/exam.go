@@ -22,9 +22,9 @@ func main() {
 		log.Printf("创建与服务器 192.168.202.128 的连接失败: %v", err)
 		return
 	}
-	err = trans.CreateConnectionToPool(pool, "47.86.232.20", "root", "czh2004_centos")
+	err = trans.CreateConnectionToPool(pool, "113.44.170.52", "root", "czh2004_centos")
 	if err != nil {
-		log.Printf("创建与服务器 47.86.232.20 的连接失败: %v", err)
+		log.Printf("创建与服务器 113.44.170.52 的连接失败: %v", err)
 		return
 	}
 
@@ -35,7 +35,7 @@ func main() {
 	taskID, err := service.CreateTransferBetween2STask(
 		"192.168.202.128",      // 源服务器IP
 		"/home/czh/docker.txt", // 源文件路径
-		"47.86.232.20",         // 目标服务器IP
+		"113.44.170.52",        // 目标服务器IP
 		"/root/docker.txt",     // 目标文件路径
 	)
 	if err != nil {

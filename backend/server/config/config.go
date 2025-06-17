@@ -56,6 +56,7 @@ type Script struct {
 	StartPort string `yaml:"start_port"`
 	EndPort   string `yaml:"end_port"`
 	SshTunnelUsername string `yaml:"ssh_tunnel_username"`
+	SshTunnelPassword string `yaml:"ssh_tunnel_password"`
 	PublicServerIP string `yaml:"public_server_ip"`
 	GithubRepoUrl  string `yaml:"github_repo_url"`
 }
@@ -77,6 +78,7 @@ var (
 	PublicServerIP string
 	GithubRepoUrl  string
 	SshTunnelUsername string
+	SshTunnelPassword string
 )
 
 // getDBConfigPath 获取数据库配置文件的路径
@@ -136,6 +138,6 @@ func LoadConfig() (*Config, error) {
 	PublicServerIP = config.Script.PublicServerIP
 	GithubRepoUrl = config.Script.GithubRepoUrl
 	SshTunnelUsername = config.Script.SshTunnelUsername
-
+	SshTunnelPassword = config.Script.SshTunnelPassword
 	return &config, nil
 }

@@ -64,16 +64,19 @@ type Claims struct {
 
 // HostInfo 结构体对应 host_info 数据库表
 type HostInfo struct {
-	ID            int       `json:"id"` // 添加 ID 字段
-	UserName      string    `json:"user_name"`      // 新增字段对应 user_name
-	Hostname      string    `json:"host_name"`      // 原名 host_name
-	IP            string    `json:"ip"`
-	OS            string    `json:"os"`
-	Platform      string    `json:"platform"`
-	KernelArch    string    `json:"kernel_arch"`
-	CreatedAt     time.Time `json:"host_info_created_at"` // 对应 created_at
-	Token         string    `json:"token"`
-	CompanyID     int      `json:"company_id,omitempty"` // 新增字段对应 company_id
+	ID           int       `json:"id"`        // 添加 ID 字段
+	UserName     string    `json:"user_name"` // 新增字段对应 user_name
+	Hostname     string    `json:"host_name"` // 原名 host_name
+	IP           string    `json:"ip"`
+	Port         int       `json:"port"`
+	OS           string    `json:"os"`
+	Platform     string    `json:"platform"`
+	KernelArch   string    `json:"kernel_arch"`
+	CreatedAt    time.Time `json:"host_info_created_at"` // 对应 created_at
+	Token        string    `json:"token"`
+	CPUThreshold float64   `json:"cpu_threshold"`
+	MemThreshold float64   `json:"mem_threshold"`
+	CompanyID    int       `json:"company_id,omitempty"` // 新增字段对应 company_id
 }
 
 type CPUInfo struct {
@@ -118,7 +121,7 @@ func InsertHostInfo(hostInfo HostInfo, username string) error {
 
 	// 检查主机记录是否存在
 	querySQL := `
-    SELECT id, host_name, EXISTS (SELECT 1 FROM host_info WHERE host_name = $1 AND os = $2 AND platform = $3 AND kernel_arch = $4)
+    SELECT id, host_name, EXISTS (SELECT 1 FROM host_info WHERE host_name = $1 AND os = $2 AND platform = $3 AND kernel_arch = $4 )
     FROM host_info WHERE host_name = $1 AND os = $2 AND platform = $3 AND kernel_arch = $4`
 
 	err := DB.QueryRow(querySQL, hostInfo.Hostname, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch).Scan(&hostInfoID, &hostname, &exists)
@@ -145,10 +148,58 @@ func InsertHostInfo(hostInfo HostInfo, username string) error {
 	} else {
 		// 插入新的主机记录
 		insertSQL := `
-        INSERT INTO host_info (host_name, ip, os, platform, kernel_arch, created_at, user_name)
-        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6)
+        INSERT INTO host_info (host_name, ip, os, platform, kernel_arch, created_at, user_name,company_id,port)
+        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6, $7,$8)
         RETURNING id, host_name`
-		err = DB.QueryRow(insertSQL, hostInfo.Hostname, hostInfo.IP, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch, username).Scan(&hostInfoID, &hostname)
+		err = DB.QueryRow(insertSQL, hostInfo.Hostname, hostInfo.IP, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch, username, hostInfo.CompanyID, hostInfo.Port).Scan(&hostInfoID, &hostname)
+		if err != nil {
+			fmt.Printf("Failed to insert host_info: %v\n", err)
+			return err
+		}
+		fmt.Printf("Inserted new host_info with ID and Name: %d and %v\n", hostInfoID, hostname)
+	}
+
+	return nil
+}
+
+func InsertHostInfoTx(tx *sql.Tx, hostInfo HostInfo, username string) error {
+	var hostInfoID int
+	var hostname string
+	var exists bool
+
+	// 检查主机记录是否存在
+	querySQL := `
+    SELECT id, host_name, EXISTS (SELECT 1 FROM host_info WHERE host_name = $1 AND os = $2 AND platform = $3 AND kernel_arch = $4)
+    FROM host_info WHERE host_name = $1 AND os = $2 AND platform = $3 AND kernel_arch = $4`
+
+	err := tx.QueryRow(querySQL, hostInfo.Hostname, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch).Scan(&hostInfoID, &hostname, &exists)
+	if err == sql.ErrNoRows {
+		fmt.Println("No matching host info found.")
+		exists = false
+	} else if err != nil {
+		fmt.Printf("Failed to query host info: %v\n", err)
+		return err
+	}
+
+	if exists {
+		// 更新已存在的主机记录
+		updateSQL := `
+        UPDATE host_info
+        SET created_at = CURRENT_TIMESTAMP
+        WHERE id = $1`
+		_, err = tx.Exec(updateSQL, hostInfoID)
+		if err != nil {
+			fmt.Printf("Failed to update host_info_created_at: %v\n", err)
+			return err
+		}
+		fmt.Printf("Updated existing host_info with ID: %d\n", hostInfoID)
+	} else {
+		// 插入新的主机记录
+		insertSQL := `
+        INSERT INTO host_info (host_name, ip, os, platform, kernel_arch, created_at, user_name,company_id, cpu_threshold, mem_threshold)
+        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6, $7, $8, $9)
+        RETURNING id, host_name`
+		err = tx.QueryRow(insertSQL, hostInfo.Hostname, hostInfo.IP, hostInfo.OS, hostInfo.Platform, hostInfo.KernelArch, username, hostInfo.CompanyID, hostInfo.CPUThreshold, hostInfo.MemThreshold).Scan(&hostInfoID, &hostname)
 		if err != nil {
 			fmt.Printf("Failed to insert host_info: %v\n", err)
 			return err
@@ -292,6 +343,52 @@ func InsertHostandToken(hostname string, Token string) error {
 	return nil
 }
 
+func InsertHostandTokenTx(tx *sql.Tx, hostname string, Token string) error {
+	var existingID int
+	// 查询是否存在
+	querySQL := `
+	SELECT id
+	FROM hostandtoken
+	WHERE host_name = $1`
+
+	err := tx.QueryRow(querySQL, hostname).Scan(&existingID)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("failed to query hostandtoken: %v", err)
+	}
+	if existingID > 0 {
+		// 更新已存在的主机记录
+		updateSQL := `
+        UPDATE hostandtoken                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+		SET 
+		    token = $1,
+		    last_heartbeat = CURRENT_TIMESTAMP
+		WHERE host_name = $2`
+		_, err = tx.Exec(updateSQL, Token, hostname)
+		if err != nil {
+			fmt.Printf("Failed to update hostandtoken's token: %v\n", err)
+			return err
+		}
+		fmt.Printf("Updated existing hostandtoken with token: %d\n", Token)
+		//fmt.Println("InsertHostandToken : The host_name already exists!")
+		return nil
+	}
+
+	// 插入新的记录
+	fmt.Println("Inserting new host")
+	insertSQL := `
+	INSERT INTO hostandtoken (host_name, token)
+	VALUES ($1, $2) RETURNING token`
+	var token string
+	err = tx.QueryRow(insertSQL, hostname, Token).Scan(&token)
+	if err != nil {
+		log.Fatalf("Failed to query host info: %v\n", err)
+		return err
+	}
+	log.Println("Insert successfully")
+
+	return nil
+}
+
 func InsertSSHKeys(hostname string, sshkey string) error {
 	var existingID int
 	//查询在host_info表中是否存在该主机名
@@ -349,7 +446,7 @@ func InsertSSHKeys(hostname string, sshkey string) error {
 	return nil
 }
 
-func InsertNotices(send string,receive string , content string) error{
+func InsertNotices(send string, receive string, content string) error {
 	var exist bool
 	//检查users中是否存在发送者和接收者
 	querySQL := fmt.Sprintf(`
@@ -357,7 +454,7 @@ func InsertNotices(send string,receive string , content string) error{
 		SELECT 1 
 		FROM users 
 		WHERE name IN ('%s', '%s')
-	);`,send,receive)
+	);`, send, receive)
 	err := DB.QueryRow(querySQL).Scan(&exist)
 	if err != nil && err != sql.ErrNoRows {
 		return fmt.Errorf("failed to query users: %v", err)
@@ -372,7 +469,7 @@ func InsertNotices(send string,receive string , content string) error{
 		SELECT 1 
 		FROM notices 
 		WHERE send = '%s' AND receive = '%s'
-	);`,send,receive)
+	);`, send, receive)
 	err = DB.QueryRow(querySQL, send, receive).Scan(&exist)
 	if err != nil && err != sql.ErrNoRows {
 		return fmt.Errorf("failed to query notices: %v", err)
@@ -385,7 +482,7 @@ func InsertNotices(send string,receive string , content string) error{
 		SET 
 		    content= $1,
 		WHERE send = $2 AND receive = $3`
-		_, err= DB.Exec(updateSQL, content, send, receive)
+		_, err = DB.Exec(updateSQL, content, send, receive)
 		if err != nil {
 			fmt.Printf("Failed to update notices's content: %v\n", err)
 			return err
@@ -581,6 +678,106 @@ func ReadNetInfo(hostname string, from, to string, result map[string]interface{}
 	result["net"] = netData
 	return nil
 }
+
+// ReadLastSystemInfo 查询指定主机的系统信息最后一条数据
+func ReadLastSystemInfo(hostname string) (map[string]interface{}, error) {
+	result := make(map[string]interface{})
+
+	// 构造 TDengine 查询语句，获取最后一条记录
+	tableName := fmt.Sprintf("%s_system_info", hostname)
+	querySQL := fmt.Sprintf(`
+        SELECT host_info, cpu_info, memory_info, network_info 
+        FROM %s 
+        ORDER BY created_at DESC 
+        LIMIT 1`, tableName)
+
+	rows, err := TDengine.Query(querySQL)
+	if err != nil {
+		return nil, fmt.Errorf("查询系统信息时发生错误: %v", err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, fmt.Errorf("未找到指定主机的系统信息")
+	}
+
+	var (
+		hostInfoJSON []byte
+		cpuInfoJSON  []byte
+		memInfoJSON  []byte
+		networkJSON  []byte
+	)
+
+	if err := rows.Scan(&hostInfoJSON, &cpuInfoJSON, &memInfoJSON, &networkJSON); err != nil {
+		return nil, fmt.Errorf("扫描记录时发生错误: %v", err)
+	}
+
+	// 解析 host_info 字段
+	var hostInfo HostInfo
+	if err := json.Unmarshal(hostInfoJSON, &hostInfo); err != nil {
+		return nil, fmt.Errorf("解析主机信息失败: %v", err)
+	}
+	result["host"] = map[string]interface{}{
+		"id":                   hostInfo.ID,
+		"host_name":            hostInfo.Hostname,
+		"os":                   hostInfo.OS,
+		"platform":             hostInfo.Platform,
+		"kernel_arch":          hostInfo.KernelArch,
+		"host_info_created_at": hostInfo.CreatedAt,
+	}
+
+	// 解析 cpu_info 字段
+	var cpuDataObj []CPUInfo
+	if err := json.Unmarshal(cpuInfoJSON, &cpuDataObj); err != nil {
+		return nil, fmt.Errorf("解析 CPU 信息失败: %v", err)
+	}
+	var cpuData []map[string]interface{}
+	for _, cpu := range cpuDataObj {
+		cpuData = append(cpuData, map[string]interface{}{
+			"id":                  cpu.ID,
+			"cores_num":           cpu.CoresNum,
+			"model_name":          cpu.ModelName,
+			"percent":             cpu.Percent,
+			"cpu_info_created_at": cpu.CreatedAt,
+		})
+	}
+	result["cpu"] = cpuData
+
+	// 解析 memory_info 字段
+	var memInfo MemoryInfo
+	if err := json.Unmarshal(memInfoJSON, &memInfo); err != nil {
+		return nil, fmt.Errorf("解析内存信息失败: %v", err)
+	}
+	result["memory"] = map[string]interface{}{
+		"id":                  memInfo.ID,
+		"total":               memInfo.Total,
+		"available":           memInfo.Available,
+		"used":                memInfo.Used,
+		"free":                memInfo.Free,
+		"user_percent":        memInfo.UserPercent,
+		"mem_info_created_at": memInfo.CreatedAt,
+	}
+
+	// 解析 network_info 字段
+	var netDataObj []NetworkInfo
+	if err := json.Unmarshal(networkJSON, &netDataObj); err != nil {
+		return nil, fmt.Errorf("解析网络信息失败: %v", err)
+	}
+	var netData []map[string]interface{}
+	for _, net := range netDataObj {
+		netData = append(netData, map[string]interface{}{
+			"id":                  net.ID,
+			"name":                net.Name,
+			"bytes_sent":          net.BytesSent,
+			"bytes_recv":          net.BytesRecv,
+			"net_info_created_at": net.CreatedAt,
+		})
+	}
+	result["net"] = netData
+
+	return result, nil
+}
+
 func ReadDB(queryType, from, to string, hostname string) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 

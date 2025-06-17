@@ -63,7 +63,7 @@ type CPUInfo struct {
 // 获取CPU信息
 func GetCpuInfo() ([]CPUInfo, error) {
 	cpuInfos := []CPUInfo{}
-	percent, err := cpu.Percent(time.Second*14, false)
+	percent, err := cpu.Percent(time.Second*14, true) // 设置第二个参数为true以获取每个核心的使用率
 	if err != nil {
 		return nil, fmt.Errorf("获取CPU使用率失败: %v", err)
 	}
@@ -73,12 +73,12 @@ func GetCpuInfo() ([]CPUInfo, error) {
 		return nil, fmt.Errorf("获取CPU信息失败: %v", err)
 	}
 
-	cpuPercent := percent[0]
-	for _, ci := range infos {
+	for i, ci := range infos {
 		cpuInfo := CPUInfo{
+			ID:        i,
 			ModelName: ci.ModelName,
 			CoresNum:  int(ci.Cores),
-			Percent:   cpuPercent,
+			Percent:   percent[i], // 每个核心的使用率应该对应其实际的使用率值
 			CreatedAt: time.Now(),
 		}
 		cpuInfos = append(cpuInfos, cpuInfo)
@@ -136,10 +136,6 @@ func GetProcess() ([]ProcessInfo, error) {
 		}
 
 		memPercent, err := p.MemoryPercent()
-		if err != nil {
-			continue
-		}
-
 		if err != nil {
 			continue
 		}

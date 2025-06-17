@@ -49,15 +49,17 @@ type Notice struct {
 
 // host_info表
 type HostInfo struct {
-	ID         int    `json:"id"`        // 添加 ID 字段
-	UserName   string `json:"user_name"` // 新增字段对应 user_name
-	Hostname   string `json:"host_name"` // 原名 host_name
-	IP         string `json:"ip"`
-	OS         string `json:"os"`
-	Platform   string `json:"platform"`
-	KernelArch string `json:"kernel_arch"`
-	CreatedAt  string `json:"host_info_created_at"` // 对应 created_at
-	CompanyID  int    `json:"company_id,omitempty"` // 新增字段对应 company_id, 使用指针类型表示可选值
+	ID           int     `json:"id" gorm:"column:id"`
+	UserName     string  `json:"user_name" gorm:"column:user_name"`
+	Hostname     string  `json:"host_name" gorm:"column:host_name"`
+	CompanyID    int     `json:"company_id,omitempty" gorm:"column:company_id"`
+	IP           string  `json:"ip" gorm:"column:ip"`
+	OS           string  `json:"os" gorm:"column:os"`
+	Platform     string  `json:"platform" gorm:"column:platform"`
+	KernelArch   string  `json:"kernel_arch" gorm:"column:kernel_arch"`
+	CPUThreshold float64 `json:"cpu_threshold" gorm:"column:cpu_threshold"`
+	MemThreshold float64 `json:"mem_threshold" gorm:"column:mem_threshold"`
+	CreatedAt    string  `json:"host_info_created_at" gorm:"column:created_at"`
 }
 
 // TableName 指定表名
@@ -73,10 +75,24 @@ type HostAndToken struct {
 	Status        string `json:"status" gorm:"default 'offline'"`
 }
 
+func (HostAndToken) TableName() string {
+	return "hostandtoken" // 数据库表名对应
+}
+
 type SSHPort struct {
-	ID         int       `json:"id"`
-	Port       int       `json:"port" gorm:"column:port"`
-	IsUsed     bool      `json:"is_used" gorm:"default:false"`
-	AssignedTo string    `json:"assigned_to" gorm:"column:assigned_to"`
-	UpdatedAt  time.Time `json:"update_at" gorm:"column:update_at"`
+	ID        int       `json:"id"`
+	Port      int       `json:"port" gorm:"column:port"`
+	IsUsed    bool      `json:"is_used" gorm:"default:false"`
+	Hostname  string    `json:"hostname" gorm:"column:hostname"`
+	UpdatedAt time.Time `json:"updated_at" gorm:"column:updated_at"`
+}
+
+// Warning 定义告警记录结构体
+type Warning struct {
+	ID           uint      `gorm:"primaryKey" json:"id"`
+	HostName     string    `json:"host_name"`
+	Username     string    `json:"username"`
+	WarningType  string    `json:"warning_type"`
+	WarningTitle string    `json:"warning_title"`
+	WarningTime  time.Time `json:"warning_time"`
 }

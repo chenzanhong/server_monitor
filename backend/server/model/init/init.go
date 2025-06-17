@@ -67,24 +67,15 @@ CREATE TABLE IF NOT EXISTS host_info (
     user_name VARCHAR, -- REFERENCES users(name),
 	host_name VARCHAR(255)  UNIQUE,
 	ip VARCHAR(255)  UNIQUE,
-	company_id INT, -- REFERENCES company(id),
+	port INT DEFAULT 22,
+	company_id INT DEFAULT 0, -- REFERENCES company(id),
 	os TEXT NOT NULL,
 	platform TEXT NOT NULL,
 	kernel_arch TEXT NOT NULL,
+	cpu_threshold FLOAT DEFAULT 0.9,
+	mem_threshold FLOAT DEFAULT 0.9,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- TIMESTAMP WITH TIME ZONE 加上时区
 );
-
--- system_info表
--- CREATE TABLE IF NOT EXISTS system_info (
--- 	id SERIAL PRIMARY KEY,
---	host_info_id INT, -- REFERENCES host_info(id),
---	host_name VARCHAR(255), -- REFERENCES host_info(host_name),
---	cpu_info JSONB,
---	memory_info JSONB,
---	process_info JSONB,
---	network_info JSONB,
---	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
---);
 
 -- token表
 CREATE TABLE IF NOT EXISTS hostandtoken (
@@ -103,12 +94,12 @@ CREATE TABLE IF NOT EXISTS ssh_keys (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ssh_port表，用于生成配置反向ssh的脚本
+-- ssh_ports表，用于生成配置反向ssh的脚本
 CREATE TABLE IF NOT EXISTS ssh_ports (
 	id SERIAL PRIMARY KEY,
     port INT,
     is_used BOOLEAN NOT NULL DEFAULT FALSE,
-    assigned_to TEXT,
+    hostname VARCHAR(255), 
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -122,7 +113,15 @@ CREATE TABLE IF NOT EXISTS notices (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-
+-- warning 表
+CREATE TABLE IF NOT EXISTS warnings (
+    id SERIAL PRIMARY KEY,
+	host_name VARCHAR(255) ,
+	username VARCHAR(255) ,
+    warning_type VARCHAR NOT NULL,
+	warning_title VARCHAR NOT NULL,
+	warning_time TIMESTAMP DEFAULT NOW()
+);
 -- 在system_info表的host_info_id字段上创建索引，加速通过主机ID查找系统信息
 -- CREATE INDEX IF NOT EXISTS idx_system_info_host_info_id ON system_info(host_info_id);
 
@@ -370,6 +369,13 @@ func InitDBData() error {
 		return err
 	}
 	fmt.Println("8---------------")
+
+	//插入warning数据
+	if err := insertWarning(tx); err != nil {
+		tx.Rollback()
+		return err
+	}
+	fmt.Println("9---------------")
 
 	if err := tx.Commit().Error; err != nil {
 		return err // 返回提交事务时的错误
@@ -735,7 +741,7 @@ func insertNotices(tx *gorm.DB) error {
 	return scanner.Err()
 }
 
-// insertPortPool 函数从 portpool.txt 文件中读取端口池数据
+// insertPortPool 根据配置文件config.yaml的参数初始化ssh_ports表
 func initPortPool(tx *gorm.DB) error {
 	startPort := cf.StartPort
 	endPort := cf.EndPort
@@ -747,4 +753,43 @@ func initPortPool(tx *gorm.DB) error {
 		}
 	}
 	return nil
+}
+
+// insertWarning  函数从 warning.txt 文件中读取警告数据
+func insertWarning(tx *gorm.DB) error {
+	file, err := os.Open("asset/example/warning.txt")
+	if err != nil {
+		return fmt.Errorf("failed to open warning file: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// 检查是否以 "//" 开头
+		if strings.HasPrefix(line, "//") {
+			fmt.Println("Encountered a comment line, exiting the loop.")
+			break // 退出循环
+		}
+		parts := strings.Split(line, ",")
+		if len(parts) < 4 {
+			return fmt.Errorf("invalid line format: %s", line)
+		}
+
+		hostname := parts[0]
+		username := parts[1]
+		warning_type := parts[2]
+		warning_title := parts[3]
+		warning_time := time.Now().Format("2006-01-02 15:04:05")
+		fmt.Println(hostname)
+		fmt.Println(username)
+		fmt.Println(warning_type)
+		fmt.Println(warning_title)
+		fmt.Println(warning_time)
+
+		if err := tx.Exec("INSERT INTO warnings (host_name, username, warning_type, warning_title, warning_time) VALUES (?, ?, ?, ?, ?)", hostname, username, warning_type, warning_title, warning_time).Error; err != nil {
+			return fmt.Errorf("failed to insert warning for %s: %w", hostname, err)
+		}
+	}
+	return scanner.Err()
 }

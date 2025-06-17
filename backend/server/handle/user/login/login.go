@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -14,6 +15,8 @@ import (
 
 	m_init "backend/server/model/init"
 	u "backend/server/model/user"
+
+	e "backend/server/handle/email"
 )
 
 // RegisterRequest 定义注册请求的数据结构
@@ -22,6 +25,7 @@ type RegisterRequest struct {
 	Name     string `json:"name"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	Token    string `json:"token"`
 }
 
 // LoginRequest 定义登录请求的数据结构
@@ -31,9 +35,11 @@ type LoginRequest struct {
 }
 
 // 正则表达式验证邮箱格式
-func isValidEmail(email string) bool {
-	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-	return emailRegex.MatchString(email) // 返回是否匹配
+func IsValidEmail(email string) bool {
+    // 正则表达式
+    emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+    
+    return emailRegex.MatchString(email)
 }
 
 // Register 用户注册接口
@@ -59,6 +65,38 @@ func Register(c *gin.Context) {
 		return
 	}
 
+	// 检查token是否正确
+	e.EmailTokenMutex.Lock()
+	tokenInfo, exists := e.EmailToken[input.Email]
+	e.EmailTokenMutex.Unlock()
+	if !exists {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "未请求验证码或验证码已过期，请重新获取。"})
+		return
+	}
+
+	if time.Now().After(tokenInfo.ExpiresAt) {
+		// 清除过期记录
+		e.EmailTokenMutex.Lock()
+		delete(e.EmailToken, input.Email)
+		e.EmailTokenMutex.Unlock()
+
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "验证码已过期，请重新获取。"})
+		return
+	}
+
+	if tokenInfo.Token != input.Token {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "验证码错误，请重新输入。"})
+		return
+	}
+
+	// 验证通过，清除该邮箱的验证码
+
+	// 去除前后空格
+	input.Email = strings.TrimSpace(input.Email)
+	e.EmailTokenMutex.Lock()
+	delete(e.EmailToken, input.Email)
+	e.EmailTokenMutex.Unlock()
+
 	// 数据验证
 	if len(input.Name) == 0 {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "用户名不能为空"})
@@ -66,7 +104,7 @@ func Register(c *gin.Context) {
 	} else if len(input.Email) == 0 {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "邮箱不能为空"})
 		return
-	} else if !isValidEmail(input.Email) {
+	} else if !IsValidEmail(input.Email) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "邮箱格式不正确"})
 		return
 	} else if len(input.Password) < 6 || len(input.Password) > 16 {
@@ -85,7 +123,7 @@ func Register(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询用户名失败"})
 		return
 	}
-
+	// 检查邮箱是否存在
 	err = m_init.DB.Where("email = ?", input.Email).First(&user).Error
 	if err == nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"message": "邮箱已存在"})
@@ -95,38 +133,14 @@ func Register(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询邮箱失败"})
 		return
 	}
-	// 检查公司名是否存在
-	var company u.Company
-	companyId := 0
-	err = m_init.DB.Where("name =?", input.Company).First(&company).Error
-	if err == nil {
-		companyId = company.ID
-	} else if errors.Is(err, gorm.ErrRecordNotFound) {
-		companyId = 0
-	} else {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询公司失败"})
-		return
-	}
-	// // 检查公司名是否存在
-	// var company u.Company
-	// companyId := 0
-	// err = m_init.DB.Where("name =?", input.Company).First(&company).Error
-	// if err == nil {
-	// 	companyId = company.ID
-	// } else if errors.Is(err, gorm.ErrRecordNotFound) {
-	// 	companyId = 0
-	// } else {
-	// 	c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询公司失败"})
-	// 	return
-	// }
 
 	// 创建用户
 	newUser := u.User{
 		Name:       input.Name,
+		Realname:   input.Name,
 		Email:      input.Email,
 		Password:   input.Password,
 		RoleId:     0,
-		CompanyId:  companyId, //companyId,
 		IsVerified: true,
 	}
 	err = m_init.DB.Create(&newUser).Error

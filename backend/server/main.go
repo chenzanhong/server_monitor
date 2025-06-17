@@ -6,6 +6,7 @@ import (
 	"backend/server/handle/agent/getscript"
 	"backend/server/handle/agent/install"
 	pt "backend/server/handle/agent/port"
+	"backend/server/handle/agent/threshold"
 	"backend/server/handle/company"
 	e "backend/server/handle/email"
 	"backend/server/handle/server/monitor" // 引入 monitor 包
@@ -133,6 +134,7 @@ func main() {
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL("/docs/swagger.json")))
 
 	router.POST("/agent/register", login.Register)
+	router.POST("/registertoken", e.SendVerificationCode) // 注册时发送验证码邮件
 	router.POST("/agent/login", login.Login)
 	router.GET("/defaultagentscript", getscript.GetAgentScript) // 获取安装代理程序的脚本
 
@@ -150,7 +152,7 @@ func main() {
 		auth.POST("/info/manage", info.ManageNotice)      //处理通知状态
 
 		// 系统/公司管理员操作
-		auth.POST("/registercompany", company.Register)       //注册公司
+		auth.POST("/registercompany", company.Register)       // 注册公司
 		auth.POST("/addMember", admin.AddMember)              // 添加成员
 		auth.POST("/deleteMembers", admin.DeleteMember)       // 批量删除成员
 		auth.GET("/getmemberinfo", admin.GetMemberInfo)       // 获取公司成员信息
@@ -158,19 +160,23 @@ func main() {
 		auth.GET("/get-company-list", company.GetCompanyList) // 公司列表
 		auth.POST("/sshkey", admin.AddSShkey)                 // 添加SSH密钥
 		auth.POST("/joincompany", admin.JoinCompany)          // 邀请成员加入公司
-		auth.POST("/replaceadmin", admin.ReplaceAdmin)        // 更换管理员
+		auth.POST("/replaceadmin", admin.ReplaceAdmin)        // 更换管 3理员
 
 		// 监控
 		auth.POST("/install", install.InstallAgent)
-		auth.GET("/list", monitor.ListAgent)
+		auth.GET("/list", monitor.HostInfoList)
 		auth.GET("/monitor/:hostname", monitor.GetAgentInfo)
 		auth.GET("/monitor/status/:hostname", monitor.GetLatestSystemInfo)
+		auth.POST("/delete", monitor.DeleteSystemInfo)
+		auth.GET("/getwarning", monitor.GetWarningRecordsByHostname)
 
 		// 脚本
-		auth.GET("/agentscript", getscript.GetAgentScript)       // 获取安装代理程序的脚本
-		auth.GET("/sshscript", getscript.GetSSHScript)           // 获取配置反向ssh的脚本
-		auth.GET("/combinedscript", getscript.GetCombinedScript) // 获取合并后的脚本——包含安装代理程序和配置反向SSH隧道
-		auth.GET("/port/get", pt.GetAvailablePort)               // 获取用于生成ssh脚本所需要的端口port
+		auth.GET("/agentscript", getscript.GetAgentScript)                         // 获取安装代理程序的脚本
+		auth.GET("/sshscript", getscript.GetSSHScript)                             // 获取配置反向ssh的脚本
+		auth.GET("/combinedscript", getscript.GetCombinedScript)                   // 获取合并后的脚本——包含安装代理程序和配置反向SSH隧道
+		auth.GET("/uninstallagentscript", getscript.GetAgentUninstallScript)       // 获取删除代理服务的脚本，?hostname=
+		auth.GET("/uninstallcombinedscript", getscript.GetCombinedUninstallScript) // 获取删除联合服务的脚本，?hostname=
+		auth.GET("/port/get", pt.GetAvailablePort)                                 // 获取用于生成ssh脚本所需要的端口port
 
 		// 文件传输
 		auth.POST("/upload", transfer.CommonUpload)
@@ -182,8 +188,22 @@ func main() {
 
 		// 日志
 		auth.POST("/getuseroperationlogs", logs.GetUserOperationLogs) // 获取用户操作日志，支持按时间段、操作类型、按用户名筛选
+
+		// 预警
+		auth.POST("/setthreshold", threshold.UpdateThreshold) // 设置阈值
 	}
 
+	router.GET("/agentscript", getscript.GetAgentScript)                         // 获取安装代理程序的脚本，?hostname=
+	router.GET("/combinedscript", getscript.GetCombinedScript)                   // 获取安装代理程序的脚本，?hostname=
+	router.GET("/uninstallagentscript", getscript.GetAgentUninstallScript)       // 获取删除代理服务的脚本，?hostname=
+	router.GET("/uninstallcombinedscript", getscript.GetCombinedUninstallScript) // 获取删除联合服务的脚本，?hostname=
+
 	router.POST("/agent/addSystem_info", monitor.ReceiveAndStoreSystemMetrics)
+
+	err = monitor.StartWorkerPool(100, 10000) // 100个消费者，管道长度10000
+	if err != nil {
+		log.Fatalf("Failed to start worker pool: %v", err)
+	}
+
 	router.Run("0.0.0.0:8080")
 }
