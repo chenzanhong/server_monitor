@@ -2,7 +2,7 @@ package info
 
 import (
 	"fmt"
-	logs "backend/server/logs"
+	"backend/server/logs"
 	model "backend/server/model"
 	m_init "backend/server/model/init"
 	m_user "backend/server/model/user"
@@ -29,26 +29,34 @@ func ManageNotice(c *gin.Context) {
 	var requestBody m_user.Notice
 	err := c.BindJSON(&requestBody)
 	if err != nil {
+		log.Printf("请求数据格式错误")
+		logs.Sugar.Errorw("通知处理", "username", username, "detail", "解析请求失败，请检查请求格式是否正确")
 		c.JSON(http.StatusBadRequest, gin.H{"message": "请求数据格式错误"})
 		return
 	}
+
+	var detail = fmt.Sprintf("通知id:%d,发送者:%s,接收人:%s,内容:%s", requestBody.ID, requestBody.Send ,requestBody.Receive, requestBody.Content)
 
 	// 根据通知id查找对应的通知
 	var notice m_user.Notice
 	err = m_init.DB.Where("id = ?", requestBody.ID).First(&notice).Error
 	if err != nil {
+		log.Println("通知不存在")
+		logs.Sugar.Errorw("通知处理", "username", username, "detail", "通知不存在。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "通知不存在"})
 		return
 	}
 
 	if notice.State == "processed" || notice.State == "expired" {
 		log.Println("通知已处理或已过期")
+		logs.Sugar.Errorw("通知处理", "username", username, "detail", "通知已处理或已过期。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "通知已处理或已过期"})
 		return
 	}
 
 	if notice.Receive != username {
 		log.Println("处理的用户不是接收人")
+		logs.Sugar.Errorw("通知处理", "username", username, "detail", "处理的用户不是接收人。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "处理的用户不是接收人"})
 		return
 	}
@@ -56,6 +64,8 @@ func ManageNotice(c *gin.Context) {
 	// 检查通知是否已经过期(通知的有效期限是14天)
 	createAtTime, err := time.Parse(time.RFC3339, notice.CreateAt)
 	if err != nil {
+		log.Println("时间格式错误")
+		logs.Sugar.Errorw("通知处理", "username", username, "detail", "时间格式错误。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "时间格式错误"})
 		return
 	}
@@ -64,10 +74,12 @@ func ManageNotice(c *gin.Context) {
 		update := `UPDATE notices SET state = 'expired' WHERE id = $1`
 		_, err := model.DB.Exec(update, requestBody.ID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新通知状态失败"})
 			log.Println("更新通知状态失败:", err)
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "更新通知状态失败。"+ detail)
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新通知状态失败"})
 			return
 		}
+		logs.Sugar.Errorw("通知处理", "username", username, "detail", "通知已过期。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "通知已过期"})
 		return
 	}
@@ -77,8 +89,9 @@ func ManageNotice(c *gin.Context) {
 	query := "SELECT role_id FROM users WHERE name = $1"
 	err = model.DB.QueryRow(query, username).Scan(&role_id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "查询用户权限失败"})
 		log.Println("查询用户权限失败:", err)
+		logs.Sugar.Errorw("通知处理", "username", username, "detail", "查询用户权限失败。"+ detail)
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "查询用户权限失败"})
 		return
 	}
 
@@ -88,6 +101,8 @@ func ManageNotice(c *gin.Context) {
 	if strings.Contains(notice.Content, "申请注册公司") {
 		// 检查是否为系统管理员
 		if role_id != 2 {
+			log.Println("接收人不是系统管理员")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "接收人不是系统管理员。"+ detail)
 			c.JSON(http.StatusBadRequest, gin.H{"message": "接收人不是系统管理员"})
 			return
 		}
@@ -95,6 +110,7 @@ func ManageNotice(c *gin.Context) {
 		parts := strings.Split(notice.Content, "申请注册公司:")
 		if len(parts) < 2 {
 			log.Println("通知内容格式错误：缺少 '申请注册公司:' 分隔符")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "通知内容格式错误。"+ detail)
 			c.JSON(http.StatusBadRequest, gin.H{"message": "通知内容格式错误"})
 			return
 		}
@@ -103,6 +119,7 @@ func ManageNotice(c *gin.Context) {
 		parts = strings.Split(parts[1], "，法人:")
 		if len(parts) < 2 {
 			log.Println("通知内容格式错误：缺少 '，法人:' 分隔符")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "通知内容格式错误。"+ detail)
 			c.JSON(http.StatusBadRequest, gin.H{"message": "通知内容格式错误"})
 			return
 		}
@@ -119,6 +136,7 @@ func ManageNotice(c *gin.Context) {
 		err := model.DB.QueryRow(query, admin_username).Scan(&admin_id)
 		if err != nil {
 			log.Println(logs.GetLogPrefix(2) + "管理员用户名不存在")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "管理员用户名不存在。"+ detail)
 			fmt.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"message": "管理员用户名不存在"})
 			return
@@ -129,6 +147,7 @@ func ManageNotice(c *gin.Context) {
 		_, err = model.DB.Exec(query, admin_id, company_name, social_credit_code, 1)
 		if err != nil {
 			log.Println(logs.GetLogPrefix(2) + "创建公司失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "创建公司失败。"+ detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "创建公司失败"})
 			return
 		}
@@ -139,6 +158,7 @@ func ManageNotice(c *gin.Context) {
 		err = model.DB.QueryRow(query, company_name).Scan(&company_id)
 		if err != nil {
 			log.Println(logs.GetLogPrefix(2) + "查询公司编号失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "查询公司编号失败。"+ detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "查询公司编号失败"})
 			return
 		}
@@ -148,6 +168,8 @@ func ManageNotice(c *gin.Context) {
 		_, err = model.DB.Exec(update, company_id, 1, admin_username)
 		if err != nil {
 			log.Println(logs.GetLogPrefix(2) + "更新公司管理员信息失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "更新公司管理员信息失败。"+ detail)
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新公司管理员信息失败"})
 			return
 		}
 
@@ -156,10 +178,12 @@ func ManageNotice(c *gin.Context) {
 		_, err = model.DB.Exec(update, "processed", notice.ID)
 		if err != nil {
 			log.Println(logs.GetLogPrefix(2) + "更新通知状态失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "更新通知状态失败。"+ detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新通知状态失败"})
 			return
 		}
 
+		logs.Sugar.Infow("通知处理", "username", username, "detail", "通知处理成功。"+ detail)
 		c.JSON(http.StatusOK, gin.H{"message": "通知处理成功"})
 		return
 	}
@@ -169,6 +193,7 @@ func ManageNotice(c *gin.Context) {
 		// 检查是否是系统管理员
 		if role_id != 2 {
 			log.Println(logs.GetLogPrefix(2) + "非系统管理员无法处理通知")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "非系统管理员无法处理通知。"+ detail)
 			c.JSON(http.StatusUnauthorized, gin.H{"message": "非系统管理员无法处理通知"})
 			return
 		}
@@ -176,6 +201,7 @@ func ManageNotice(c *gin.Context) {
 		parts := strings.Split(notice.Content, "申请更换公司管理")
 		if len(parts) < 2 {
 			log.Println("通知内容格式错误：缺少 '申请更换公司管理' 分隔符")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "通知内容格式错误。"+ detail)
 			c.JSON(http.StatusBadRequest, gin.H{"message": "通知内容格式错误"})
 			return
 		}
@@ -185,12 +211,14 @@ func ManageNotice(c *gin.Context) {
 		parts = strings.Split(parts[1], ",新管理员用户名:")
 		if len(parts) < 2 {
 			log.Println("通知内容格式错误：缺少 ',新管理员用户名:' 分隔符")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "通知内容格式错误。"+ detail)
 			c.JSON(http.StatusBadRequest, gin.H{"message": "通知内容格式错误"})
 			return
 		}
 		parts = strings.Split(parts[1], ",新管理员邮箱:")
 		if len(parts) < 2 { 
 			log.Println("通知内容格式错误：缺少 ',新管理员邮箱:' 分隔符")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "通知内容格式错误。"+ detail)
 			c.JSON(http.StatusBadRequest, gin.H{"message": "通知内容格式错误"})
 		}
 		new_admin := strings.TrimSpace(parts[0])
@@ -201,6 +229,7 @@ func ManageNotice(c *gin.Context) {
 		query = "select company_id from users where name = $1"
 		if err := m_init.DB.Raw(query, old_admin).Scan(&company_id).Error; err != nil {
 			log.Println("获取原管理员公司编号失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "获取原管理员公司编号失败。"+ detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "获取原管理员公司编号失败"})
 			return
 		}
@@ -210,6 +239,7 @@ func ManageNotice(c *gin.Context) {
 		query = "select id from users where name = $1"
 		if err := m_init.DB.Raw(query, new_admin).Scan(&new_admin_id).Error; err != nil {
 			log.Println("获取新管理员编号失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "获取新管理员编号失败。"+ detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "获取新管理员编号失败"})
 			return
 		}
@@ -218,6 +248,7 @@ func ManageNotice(c *gin.Context) {
 		update := "update users set role_id = 0 where name = $1"
 		if err := m_init.DB.Exec(update, old_admin).Error; err != nil {
 			log.Println("更新旧管理员权限失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "更新旧管理员权限失败。"+ detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新旧管理员权限失败"})
 			return
 		}
@@ -225,6 +256,7 @@ func ManageNotice(c *gin.Context) {
 		update = "update users set role_id = 1 where name = $1"
 		if err := m_init.DB.Exec(update, new_admin).Error; err != nil {
 			log.Println("更新新管理员权限失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "更新新管理员权限失败。"+ detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新新管理员权限失败"})
 			return
 		}
@@ -232,6 +264,7 @@ func ManageNotice(c *gin.Context) {
 		update = "update companies set admin_id = $1 where id = $2"
 		if err := m_init.DB.Exec(update, new_admin_id, company_id).Error; err != nil {
 			log.Println("更新公司管理员id失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "更新公司管理员id失败。"+ detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新公司管理员id失败"})
 			return
 		}
@@ -240,10 +273,12 @@ func ManageNotice(c *gin.Context) {
 		update = "update notices set state = $1 where id = $2"
 		if err := m_init.DB.Exec(update, "processed", notice.ID).Error; err != nil {
 			log.Println("更新通知状态失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "更新通知状态失败。"+ detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新通知状态失败"})
 			return
 		}
 
+		logs.Sugar.Infow("通知处理", "username", username, "detail", "通知处理成功。"+ detail)
 		c.JSON(http.StatusOK, gin.H{"message": "通知处理成功"})
 		return
 	}
@@ -253,6 +288,7 @@ func ManageNotice(c *gin.Context) {
 		parts := strings.Split(notice.Content, "加入")
 		if len(parts) < 2 || parts[1] == "" {
 			log.Println("通知内容格式错误：缺少 '加入' 后的内容")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "通知内容格式错误。"+ detail)
 			c.JSON(http.StatusBadRequest, gin.H{"message": "通知内容格式错误"})
 			return
 		}
@@ -264,6 +300,7 @@ func ManageNotice(c *gin.Context) {
 		err := m_init.DB.Raw(query, companyName).Scan(&companyId).Error
 		if err != nil {
 			log.Println("数据库查询公司失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "数据库查询公司失败。"+ detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询公司失败"})
 			return
 		}
@@ -273,6 +310,7 @@ func ManageNotice(c *gin.Context) {
 		err = m_init.DB.Exec(query, companyId, username).Error
 		if err != nil {
 			log.Println("数据库更新用户所属公司失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "数据库更新用户所属公司失败。"+ detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库更新用户所属公司失败"})
 			return
 		}
@@ -281,6 +319,7 @@ func ManageNotice(c *gin.Context) {
 		err = m_init.DB.Exec(query, companyId).Error
 		if err != nil {
 			log.Println("数据库更新公司成员数量失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "数据库更新公司成员数量失败。"+ detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库更新公司成员数量失败"})
 			return
 		}
@@ -290,10 +329,12 @@ func ManageNotice(c *gin.Context) {
 		err = m_init.DB.Exec(query, "processed", notice.ID).Error
 		if err != nil {
 			log.Println("数据库更新通知状态失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "数据库更新通知状态失败。"+ detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库更新通知状态失败"})
 			return
 		}
 
+		logs.Sugar.Infow("通知处理", "username", username, "detail", "通知处理成功。"+ detail)
 		c.JSON(http.StatusOK, gin.H{"message": "通知处理成功"})
 	}
 }

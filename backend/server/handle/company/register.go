@@ -5,6 +5,7 @@ import (
 	m_init "backend/server/model/init"
 	u "backend/server/model/user"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -22,7 +23,7 @@ type RegisterRequest struct {
 	Admin_Email        string `json:"admin_email"`
 }
 
-// 邀请团队
+// 申请注册公司
 func Register(c *gin.Context) {
 
 	Username, exists := c.Get("username")
@@ -40,20 +41,25 @@ func Register(c *gin.Context) {
 
 	// 解析JSON数据
 	if err := c.BindJSON(&input); err != nil {
-		log.Println(logs.GetLogPrefix(2) + "数据库查询公司失败")
+		log.Printf("请求数据格式错误")
+		logs.Sugar.Errorw("申请注册公司", "username", username, "detail", "解析请求失败，请检查请求格式是否正确")
 		c.JSON(http.StatusBadRequest, gin.H{"message": "请求数据格式错误"})
 		return
 	}
 
+	var detail = fmt.Sprintf("公司名称:%s,公司法人:%s,公司管理员:%s,社会信用代码:%s,管理员邮箱:%s",input.Company, input.Legal_Name, input.Admin_Name, input.Social_Credit_Code, input.Admin_Email)
+
 	//检查公司名是否已经存在
 	var company u.Company
 	if err := m_init.DB.Where("name = ?", input.Company).First(&company).Error; err == nil {
-		log.Println(logs.GetLogPrefix(2) + "公司名已存在")
+		log.Printf("公司已存在")
+		logs.Sugar.Errorw("申请注册公司", "username", username, "detail", "公司已存在。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "公司名已存在"})
 		return
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		log.Println(logs.GetLogPrefix(2) + "数据库查询公司失败")
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询公司失败"})
+		log.Printf("数据库查询失败")
+		logs.Sugar.Errorw("申请注册公司", "username", username, "detail", "查询公司名失败。"+ detail)
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "查询公司名失败"})
 		return
 	}
 
@@ -64,12 +70,14 @@ func Register(c *gin.Context) {
 	//}
 	//检测公司统一社会信用代码是否已经存在
 	if err := m_init.DB.Where("social_credit_code = ?", input.Social_Credit_Code).First(&company).Error; err == nil {
-		log.Println(logs.GetLogPrefix(2) + "公司统一社会信用代码已存在")
+		log.Printf("公司已存在")
+		logs.Sugar.Errorw("申请注册公司", "username", username, "detail", "公司统一社会信用代码已经存在。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "公司统一社会信用代码已存在"})
 		return
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		log.Println(logs.GetLogPrefix(2) + "数据库查询公司失败")
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询公司失败"})
+		log.Printf("查询公司统一社会信用代码失败")
+		logs.Sugar.Errorw("申请注册公司", "username", username, "detail", "查询公司统一社会信用代码失败。"+ detail)
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "查询公司统一社会信用代码失败"})
 		return
 	}
 
@@ -77,30 +85,37 @@ func Register(c *gin.Context) {
 	var admin u.User
 	if err := m_init.DB.Where("name = ?", username).First(&admin).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Println(logs.GetLogPrefix(2) + "用户信息不存在")
-			c.JSON(http.StatusBadRequest, gin.H{"message": "用户信息不存在"})
+			log.Printf("管理员用户信息不存在")
+			logs.Sugar.Errorw("申请注册公司", "username", username, "detail", "管理员用户信息不存在。"+ detail)
+			c.JSON(http.StatusBadRequest, gin.H{"message": "管理员用户信息不存在"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询用户失败"})
+		log.Printf("数据库查询用户失败")
+		logs.Sugar.Errorw("申请注册公司", "username", username, "detail", "查询管理员用户信息失败。"+ detail)
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "查询管理员用户信息失败"})
 		return
 	}
 	if admin.Realname == "" {
-		log.Println(logs.GetLogPrefix(2) + "管理员需要实名,请在个人信息中实名")
+		log.Printf("管理员未实名")
+		logs.Sugar.Errorw("申请注册公司", "username", username, "detail", "管理员未实名。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "管理员需要实名,请在个人信息中实名"})
 		return
 	}
 	if admin.Realname != input.Admin_Name {
-		log.Println(logs.GetLogPrefix(2) + "管理员实名信息不匹配")
+		log.Printf("管理员实名信息不匹配")
+		logs.Sugar.Errorw("申请注册公司", "username", username, "detail", "管理员实名信息不匹配。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "管理员实名信息不匹配"})
 		return
 	}
 	if admin.Email != input.Admin_Email {
-		log.Println(logs.GetLogPrefix(2) + "管理员邮箱不匹配")
+		log.Printf("管理员邮箱不匹配")
+		logs.Sugar.Errorw("申请注册公司", "username", username, "detail", "管理员邮箱不匹配。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "管理员邮箱不匹配"})
 		return
 	}
 	if admin.RoleId == 1 { 
-		log.Println(logs.GetLogPrefix(2) + "已注册有公司")
+		log.Printf("已注册有公司")
+		logs.Sugar.Errorw("申请注册公司", "username", username, "detail", "已注册有公司。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "已注册有公司"})
 		return
 	}
@@ -121,11 +136,13 @@ func Register(c *gin.Context) {
 		CreateAt: createAt,
 	}
 	if err := m_init.DB.Create(&notice).Error; err != nil {
-		log.Println(logs.GetLogPrefix(2) + "数据库插入申请失败")
+		log.Printf("数据库插入申请失败")
+		logs.Sugar.Errorw("数据库插入申请失败", "username", username, "detail", "数据库插入注册公司申请失败。"+ detail)
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库插入申请失败"})
 		return
 	}
 
+	logs.Sugar.Infow("申请注册公司", "username", username, "detail", "成功发出注册公司申请。"+ detail)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "发出团队申请",
 	})

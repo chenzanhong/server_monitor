@@ -1,9 +1,11 @@
 package admin
 
 import (
+	"backend/server/logs"
 	m_init "backend/server/model/init"
 	u "backend/server/model/user"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -33,25 +35,30 @@ func JoinCompany(c *gin.Context) {
 	var input JoinRequest
 	// 解析JSON数据
 	if err := c.BindJSON(&input); err != nil {
-		log.Printf("请求数据格式错误")
+		logs.Sugar.Errorw("加入团队邀请", "username", username, "detail", "解析请求失败，请检查请求格式是否正确")
 		c.JSON(http.StatusBadRequest, gin.H{"message": "请求数据格式错误"})
 		return
 	}
+
+	var detail = fmt.Sprintf("邀请的成员实名:%s,邀请成员用户名:%s,邀请成员的邮箱:%s", input.Realname, input.Username, input.Email)
 
 	// 查询公司管理员所在公司
 	var admin u.User
 	if err := m_init.DB.Where("name =?", Username).First(&admin).Error; err != nil {
 		log.Println("数据库查询管理员失败")
+		logs.Sugar.Errorw("加入团队邀请", "username", username, "detail", "数据库查询管理员失败。"+ detail)
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询管理员失败"})
 		return
 	}
 	if admin.CompanyId == 0 {
 		log.Println("你没有就职于某个公司,需要公司管理员账户")
+		logs.Sugar.Errorw("加入团队邀请", "username", username, "detail", "你没有就职于某个公司,需要公司管理员账户。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "你没有就职于某个公司,需要公司管理员账户"})
 		return
 	}
 	if admin.RoleId != 1 {
 		log.Println("你没有邀请加入公司的权限")
+		logs.Sugar.Errorw("加入团队邀请", "username", username, "detail", "你没有邀请加入公司的权限。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "你没有邀请加入公司的权限"})
 		return
 	}
@@ -61,20 +68,24 @@ func JoinCompany(c *gin.Context) {
 	if err := m_init.DB.Where("name =?", input.Username).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Println("邀请用户不存在")
+			logs.Sugar.Errorw("加入团队邀请", "username", username, "detail", "邀请用户不存在。"+ detail)
 			c.JSON(http.StatusBadRequest, gin.H{"message": "用户不存在"})
 			return
 		}
 		log.Println("数据库查询用户失败")
+		logs.Sugar.Errorw("加入团队邀请", "username", username, "detail", "数据库查询用户失败。"+ detail)
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询用户失败"})
 		return
 	}
 	if user.Realname == ""{
 		log.Println("邀请成员未实名,请在个人信息中实名")
+		logs.Sugar.Errorw("加入团队邀请", "username", username, "detail", "邀请成员未实名,请在个人信息中实名。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "邀请成员未实名,请在个人信息中实名" })
 		return
 	}
 	if user.Realname != input.Realname{
 		log.Println("邀请成员真实姓名不匹配")
+		logs.Sugar.Errorw("加入团队邀请", "username", username, "detail", "邀请成员真实姓名不匹配。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "邀请成员真实姓名不匹配"})
 		return
 	}
@@ -89,6 +100,7 @@ func JoinCompany(c *gin.Context) {
 	//查看成员邮箱是否匹配
 	if user.Email != input.Email {
 		log.Println("成员邮箱不匹配")
+		logs.Sugar.Errorw("加入团队邀请", "username", username, "detail", "成员邮箱不匹配。"+ detail)
 		c.JSON(http.StatusBadRequest, gin.H{"message": "成员邮箱不匹配"})
 		return
 	}
@@ -98,10 +110,12 @@ func JoinCompany(c *gin.Context) {
 	if err := m_init.DB.Where("id =?", admin.CompanyId).First(&company).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Println("公司不存在")
+			logs.Sugar.Errorw("加入团队邀请", "username", username, "detail", "公司不存在。"+ detail)
 			c.JSON(http.StatusBadRequest, gin.H{"message": "公司不存在"})
 			return
 		}
 		log.Println("数据库查询公司失败")
+		logs.Sugar.Errorw("加入团队邀请", "username", username, "detail", "数据库查询公司失败。"+ detail)
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库查询公司失败"})
 		return
 	}
@@ -121,10 +135,12 @@ func JoinCompany(c *gin.Context) {
 	}
 	if err := m_init.DB.Create(&invitation).Error; err != nil {
 		log.Println("数据库插入邀请失败")
+		logs.Sugar.Errorw("加入团队邀请", "username", username, "detail", "数据库插入邀请失败。"+ detail)
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库插入邀请失败"})
 		return
 	}
 
+	logs.Sugar.Infow("加入团队邀请", "username", username, "detail", "成功发出加入公司邀请。"+ detail)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "发出加入公司邀请",
 	})
