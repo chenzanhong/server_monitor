@@ -82,9 +82,9 @@ func DeleteSystemInfo(c *gin.Context) {
 	} else {
 		log.Println("数据库没有相应的 hostandtoken 数据")
 		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "数据库没有相应的 hostandtoken 数据。"+detail)
-		tx.Rollback() // 回滚事务
-		c.JSON(http.StatusBadRequest, gin.H{"error": "数据库没有相应的 hostandtoken 数据"})
-		return
+		// tx.Rollback() // 回滚事务
+		// c.JSON(http.StatusBadRequest, gin.H{"error": "数据库没有相应的 hostandtoken 数据"})
+		// return
 	}
 
 	// 检查在 host_info 表是否存在对应的数据
@@ -97,9 +97,9 @@ func DeleteSystemInfo(c *gin.Context) {
 	if err != nil {
 		log.Printf("查询 host_info 失败")
 		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "查询 host_info 失败。"+detail)
-		tx.Rollback() // 回滚事务
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询 host_info 失败"})
-		return
+		// tx.Rollback() // 回滚事务
+		// c.JSON(http.StatusInternalServerError, gin.H{"error": "查询 host_info 失败"})
+		// return
 	}
 
 	if existingID > 0 {
@@ -117,9 +117,9 @@ func DeleteSystemInfo(c *gin.Context) {
 	} else {
 		log.Println("数据库没有相应的 host_info 数据")
 		logs.Sugar.Errorw("删除服务器", "username", username, "detail", "数据库没有相应的 host_info 数据。"+detail)
-		tx.Rollback() // 回滚事务
-		c.JSON(http.StatusBadRequest, gin.H{"error": "数据库没有相应的 host_info 数据"})
-		return
+		// tx.Rollback() // 回滚事务
+		// c.JSON(http.StatusBadRequest, gin.H{"error": "数据库没有相应的 host_info 数据"})
+		// return
 	}
 
 	// 更新 ssh_ports 表：设置 is_used = false 并清空 hostname
