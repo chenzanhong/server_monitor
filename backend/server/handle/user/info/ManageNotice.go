@@ -142,8 +142,8 @@ func ManageNotice(c *gin.Context) {
 		}
 
 		// 创建公司
-		query = "INSERT INTO companies (admin_id, name, social_credit_code, memberNum) VALUES ($1, $2, $3, $4)"
-		_, err = model.DB.Exec(query, admin_id, company_name, social_credit_code, 1)
+		insert := "INSERT INTO companies (admin_id, name, social_credit_code, memberNum) VALUES ($1, $2, $3, $4)"
+		_, err = model.DB.Exec(insert, admin_id, company_name, social_credit_code, 1)
 		if err != nil {
 			log.Println(logs.GetLogPrefix(2) + "创建公司失败")
 			logs.Sugar.Errorw("通知处理", "username", username, "detail", "创建公司失败。"+detail)
@@ -255,6 +255,15 @@ func ManageNotice(c *gin.Context) {
 			}
 		}
 
+		// 讲老管理员所有服务器的company_id字段置为0，不在属于公司，恢复为属于个人
+		update = "update host_info set company_id = 0 where user_name = $1"
+		if err := m_init.DB.Exec(update, old_admin).Error; err != nil {
+			log.Println("更新旧管理员所有服务器的归属失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "更新旧管理员所有服务器的归属失败。"+detail)
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新旧管理员所属公司失败"})
+			return
+		}
+
 		// 更换新公司管理员权限变为1——公司管理员
 		if new_admin != "root" {
 			update = "update users set role_id = 1 where name = $1"
@@ -266,11 +275,31 @@ func ManageNotice(c *gin.Context) {
 			}
 		}
 
+		// 将新管理员的所有服务器的company_id字段改为当前公司
+		update = "update host_info set company_id = $1 where user_name = $2"
+		err := m_init.DB.Exec(update, company_id, new_admin).Error
+		if err != nil {
+			log.Println("更新新管理员所有服务器的归属失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "更新新管理员所有服务器的归属失败。"+detail)
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新新管理员所有服务器的归属失败"})
+			return
+		}
+
+		// 更新新管理员的company_id字段
+		update = "update users set company_id = $1 where name = $2"
+		err = m_init.DB.Exec(update, company_id, new_admin).Error
+		if err != nil {
+			log.Println("更新新管理员所属公司失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "更新新管理员所属公司失败。"+detail)
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新新管理员所属公司失败"})
+			return
+		}
+
 		// 更换公司的管理员
 		update = "update companies set admin_id = $1 where id = $2"
 		if err := m_init.DB.Exec(update, new_admin_id, company_id).Error; err != nil {
-			log.Println("更新公司管理员id失败")
-			logs.Sugar.Errorw("通知处理", "username", username, "detail", "更新公司管理员id失败。"+detail)
+			log.Println("更新公司管理员失败")
+			logs.Sugar.Errorw("通知处理", "username", username, "detail", "更新公司管理员失败。"+detail)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "更新公司管理员id失败"})
 			return
 		}
@@ -318,9 +347,9 @@ func ManageNotice(c *gin.Context) {
 			return
 		}
 
-		// 如果新管理员之前不属于当前公司，更新当前公司成员数量，+1
-		query = "UPDATE companies SET memberNum = memberNum + 1 WHERE id = $1"
-		err = m_init.DB.Exec(query, companyId).Error
+		// 如果新成员之前不属于当前公司，更新当前公司成员数量，+1
+		update := "UPDATE companies SET memberNum = memberNum + 1 WHERE id = $1"
+		err = m_init.DB.Exec(update, companyId).Error
 		if err != nil {
 			log.Println("数据库更新公司成员数量失败")
 			logs.Sugar.Errorw("通知处理", "username", username, "detail", "数据库更新公司成员数量失败。"+detail)
@@ -328,16 +357,34 @@ func ManageNotice(c *gin.Context) {
 			return
 		}
 
-		// 如果新管理员之前属于其他某个公司A，则A的人数-1
+		// 如果新成员之前属于其他某个公司A，则A的人数-1
 		if user.CompanyId != 0 && user.CompanyId != companyId {
 			err = m_init.DB.Exec("UPDATE companies SET memberNum = memberNum - 1 WHERE id = $1", user.CompanyId).Error
-			c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库更新公司成员数量失败"})
-			return
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库更新公司成员数量失败"})
+				return
+			}
+		}
+
+		// 如果新成员之前是某一个公司的管理员，则把原来公司的管理员置为0，新成员的所有服务器的company_id置为0
+		if user.RoleId != 0{
+			update = "UPDATE companies SET admin_id = 0 WHERE id = $1"
+			err = m_init.DB.Exec(update, user.CompanyId).Error
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库更新公司管理员失败"})
+				return
+			}
+			update = "UPDATE host_info SET company_id = 0 WHERE user_name = $1"
+			err = m_init.DB.Exec(update, username).Error
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"message": "数据库更新用户所属公司失败"})
+				return
+			}
 		}
 
 		// 更改新成员公司所属
-		query = "UPDATE users SET company_id = $1 WHERE name = $2"
-		err = m_init.DB.Exec(query, companyId, username).Error
+		update = "UPDATE users SET company_id = $1 WHERE name = $2"
+		err = m_init.DB.Exec(update, companyId, username).Error
 		if err != nil {
 			log.Println("数据库更新用户所属公司失败")
 			logs.Sugar.Errorw("通知处理", "username", username, "detail", "数据库更新用户所属公司失败。"+detail)
@@ -346,8 +393,8 @@ func ManageNotice(c *gin.Context) {
 		}
 
 		// 更新通知的状态
-		query = "UPDATE notices SET state = $1 WHERE id = $2"
-		err = m_init.DB.Exec(query, "processed", notice.ID).Error
+		update = "UPDATE notices SET state = $1 WHERE id = $2"
+		err = m_init.DB.Exec(update, "processed", notice.ID).Error
 		if err != nil {
 			log.Println("数据库更新通知状态失败")
 			logs.Sugar.Errorw("通知处理", "username", username, "detail", "数据库更新通知状态失败。"+detail)

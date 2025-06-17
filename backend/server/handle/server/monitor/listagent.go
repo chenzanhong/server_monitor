@@ -75,7 +75,7 @@ func HostInfoList(c *gin.Context) {
 	}
 
 	if err != nil {
-		log.Println("Failed to query host_info; details:", err.Error)
+		log.Printf("Failed to query host_info; details: %s", err.Error)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Failed to query host_info",
 			"details": err.Error,

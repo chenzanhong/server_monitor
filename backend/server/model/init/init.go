@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS host_info (
 	host_name VARCHAR(255)  UNIQUE,
 	ip VARCHAR(255)  UNIQUE,
 	port INT DEFAULT 22,
-	company_id INT, -- REFERENCES company(id),
+	company_id INT DEFAULT 0, -- REFERENCES company(id),
 	os TEXT NOT NULL,
 	platform TEXT NOT NULL,
 	kernel_arch TEXT NOT NULL,
@@ -76,18 +76,6 @@ CREATE TABLE IF NOT EXISTS host_info (
 	mem_threshold FLOAT DEFAULT 0.9,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- TIMESTAMP WITH TIME ZONE 加上时区
 );
-
--- system_info表
--- CREATE TABLE IF NOT EXISTS system_info (
--- 	id SERIAL PRIMARY KEY,
---	host_info_id INT, -- REFERENCES host_info(id),
---	host_name VARCHAR(255), -- REFERENCES host_info(host_name),
---	cpu_info JSONB,
---	memory_info JSONB,
---	process_info JSONB,
---	network_info JSONB,
---	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
---);
 
 -- token表
 CREATE TABLE IF NOT EXISTS hostandtoken (
