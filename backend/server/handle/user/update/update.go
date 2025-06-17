@@ -18,7 +18,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 修改用户名、密码、邮箱
+// 修改真实姓名、密码、邮箱
 func UpdateUserInfo(c *gin.Context) {
 	// 从上下文中获取用户名
 	Username, exists := c.Get("username")

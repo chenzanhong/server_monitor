@@ -69,7 +69,7 @@ func UpdateThreshold(c *gin.Context) {
 	query := `
 		UPDATE host_info 
 		SET cpu_threshold = $1, mem_threshold = $2 
-		WHERE ip = $3`
+		WHERE host_name = $3`
 	result, err := tx.Exec(query, cpuThreshold, memThreshold, request.Hostname)
 	if err != nil {
 		tx.Rollback()
@@ -82,7 +82,7 @@ func UpdateThreshold(c *gin.Context) {
 	if rowsAffected == 0 {
 		tx.Rollback()
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "没有找到对应的IP，请确认IP是否正确",
+			"error": "没有找到对应的hostname，请确认hostname是否正确",
 		})
 		return
 	}
@@ -94,8 +94,8 @@ func UpdateThreshold(c *gin.Context) {
 
 	// 成功响应
 	c.JSON(http.StatusOK, gin.H{
-		"message":       "Thresholds updated successfully",
-		"ip":            request.Hostname,
+		"message": "Thresholds updated successfully",
+		"hostname": request.Hostname,
 		"cpu_threshold": cpuThreshold,
 		"mem_threshold": memThreshold,
 	})
