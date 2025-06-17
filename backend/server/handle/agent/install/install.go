@@ -3,6 +3,7 @@ package install
 import (
 	gs "backend/server/handle/agent/getscript"
 	"backend/server/model"
+	"backend/server/logs"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -48,6 +49,7 @@ func InstallAgent(c *gin.Context) {
 	// 启动事务
 	tx, err := model.DB.Begin()
 	if err != nil {
+		log.Printf("InstallAgent: failed to begin transaction: %v", err)
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to begin transaction"})
 		return
 	}
@@ -64,16 +66,23 @@ func InstallAgent(c *gin.Context) {
 	// 解析json body 到结构体 SshInfo
 	var agentInfo SshInfo
 	if err := c.BindJSON(&agentInfo); err != nil {
+		log.Printf("解析请求失败", err)
+		logs.Sugar.Errorw("安装agent", "username", username, "detail", "解析请求失败，请检查请求格式是否正确")
 		tx.Rollback()
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	var detail = fmt.Sprintf("安装agent,ip:%s,user:%s,password:%s,port:%d,host_name:%s,os:%s,platform:%s,kernel_arch:%s,cpu_threshold:%f,mem_threshold:%f", 
+								agentInfo.Host, agentInfo.User, agentInfo.Password, agentInfo.Port, agentInfo.Host_Name, agentInfo.OS, agentInfo.Platform, agentInfo.KernelArch, agentInfo.CPUThreshold, agentInfo.MemThreshold)
 
 	// 检查数据库中是否存在相同的 host_name
 	var exist bool
 	query := `SELECT EXISTS (SELECT 1 FROM host_info WHERE host_name = $1)`
 	err = tx.QueryRow(query, agentInfo.Host_Name).Scan(&exist)
 	if err != nil {
+		log.Printf("数据库查询hostname失败")
+		logs.Sugar.Errorw("安装agent", "username", username, "detail", "数据库查询hostname失败。"+ detail)
 		tx.Rollback()
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to check host_name in database"})
 		return
@@ -81,6 +90,7 @@ func InstallAgent(c *gin.Context) {
 
 	// 如果 host_name 已存在，返回错误并停止安装
 	if exist {
+		logs.Sugar.Errorw("安装agent", "username", username, "detail", "host_name 已经存在。"+ detail)
 		tx.Commit() //  提交事务
 		c.IndentedJSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("host_name '%s' already exists", agentInfo.Host_Name)})
 		return
@@ -89,6 +99,7 @@ func InstallAgent(c *gin.Context) {
 	// 生成16位随机token
 	token, err := generateToken(16)
 	if err != nil {
+		logs.Sugar.Errorw("安装agent", "username", username, "detail", "生成token失败。"+ detail)
 		tx.Rollback()
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
@@ -100,6 +111,8 @@ func InstallAgent(c *gin.Context) {
 	query = `SELECT company_id FROM users  WHERE name = $1`
 	err = tx.QueryRow(query, username).Scan(&company_id)
 	if err != nil {
+		log.Println(logs.GetLogPrefix(2) + "获取company_id失败")
+		logs.Sugar.Errorw("安装agent", "username", username, "detail", "获取company_id失败。"+ detail)
 		tx.Rollback()
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to get company_id"})
 		return
@@ -123,6 +136,8 @@ func InstallAgent(c *gin.Context) {
 	hostInfo.CompanyID = company_id
 	err = model.InsertHostInfoTx(tx, hostInfo, username)
 	if err != nil {
+		log.Println(logs.GetLogPrefix(2) + "插入host_info表失败")
+		logs.Sugar.Errorw("安装agent", "username", username, "detail", "插入host_info表失败。"+ detail)
 		tx.Rollback()
 		s := fmt.Sprintf("Failed to insert host info: %s", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": s})
@@ -134,12 +149,16 @@ func InstallAgent(c *gin.Context) {
 	cpuKey := fmt.Sprintf("cpu_threshold:%s", agentInfo.Host_Name)
 	err = redis.Rdb.Set(context.Background(), memKey, memThreshold, 0).Err()
 	if err != nil {
+		log.Println(logs.GetLogPrefix(2) + "存储内存阈值失败")
+		logs.Sugar.Errorw("安装agent", "username", username, "detail", "存储内存阈值失败。"+ detail)
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store memory threshold in Redis"})
 		return
 	}
 	err = redis.Rdb.Set(context.Background(), cpuKey, cpuThreshold, 0).Err()
 	if err != nil {
+		log.Println(logs.GetLogPrefix(2) + "存储CPU阈值失败")
+		logs.Sugar.Errorw("安装agent", "username", username, "detail", "存储CPU阈值失败。"+ detail)
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store CPU threshold in Redis"})
 		return
@@ -148,6 +167,8 @@ func InstallAgent(c *gin.Context) {
 	// 存储host_name和token到数据库
 	err = model.InsertHostandTokenTx(tx, agentInfo.Host_Name, agentInfo.Token)
 	if err != nil {
+		log.Println(logs.GetLogPrefix(2) + "存储host_name和token失败")
+		logs.Sugar.Errorw("安装agent", "username", username, "detail", "存储host_name和token失败。"+ detail)
 		tx.Rollback()
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to insert host info into database"})
 		return
@@ -163,6 +184,8 @@ func InstallAgent(c *gin.Context) {
 
 	scriptBytes, err := gs.GenerateCombinedScriptBytes(agentInfo.Host_Name, agentInfo.Token)
 	if err != nil {
+		log.Printf("InstallAgent: 生成脚本错误: %v", err)
+		logs.Sugar.Errorw("安装agent", "username", username, "detail", "生成脚本错误。"+ detail)
 		tx.Rollback()
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
@@ -176,6 +199,7 @@ func InstallAgent(c *gin.Context) {
 	// 返回脚本文件
 	if _, err := c.Writer.Write(scriptBytes); err != nil { // 注意检查 Write 的错误
 		log.Printf("InstallAgent: 写入响应体错误: %v", err)
+		logs.Sugar.Errorw("安装agent", "username", username, "detail", "写入响应体错误。"+ detail)
 		tx.Rollback()
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to write script to response",
@@ -186,10 +210,12 @@ func InstallAgent(c *gin.Context) {
 	// 提交事务
 	if err := tx.Commit(); err != nil {
 		log.Printf("InstallAgent: failed to commit transaction: %v", err)
+		logs.Sugar.Errorw("安装agent", "username", username, "detail", "提交事务失败。"+ detail)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit database changes"})
 		return
 	}
 
+	logs.Sugar.Infow("安装agent", "username", username, "detail", "安装agent成功。"+ detail)
 	// 安装成功，返回成功信息
 	// c.IndentedJSON(http.StatusOK, gin.H{"message": "Agent installed successfully", "host_name": agentInfo.Host_Name, "token": agentInfo.Token})
 }
