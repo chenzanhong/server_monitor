@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -35,8 +36,10 @@ type LoginRequest struct {
 
 // 正则表达式验证邮箱格式
 func IsValidEmail(email string) bool {
-	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-	return emailRegex.MatchString(email) // 返回是否匹配
+    // 正则表达式
+    emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+    
+    return emailRegex.MatchString(email)
 }
 
 // Register 用户注册接口
@@ -87,6 +90,9 @@ func Register(c *gin.Context) {
 	}
 
 	// 验证通过，清除该邮箱的验证码
+
+	// 去除前后空格
+	input.Email = strings.TrimSpace(input.Email)
 	e.EmailTokenMutex.Lock()
 	delete(e.EmailToken, input.Email)
 	e.EmailTokenMutex.Unlock()

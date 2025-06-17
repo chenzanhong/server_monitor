@@ -37,10 +37,11 @@ type EmailRequest struct {
 	Subject     string `json:"subject" form:"subject"`
 }
 
-// 正则表达式验证邮箱格式
 func IsValidEmail(email string) bool {
-	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-	return emailRegex.MatchString(email) // 返回是否匹配
+    // 正则表达式
+    emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+    
+    return emailRegex.MatchString(email)
 }
 
 // SendEmail 是一个通用的邮件发送函数
@@ -189,6 +190,8 @@ func GenerateRandomToken(length int) string {
 // 发送验证码
 func SendVerificationCode(c *gin.Context) {
 	email := c.Query("email")
+    // 去除前后空格
+    email = strings.TrimSpace(email)
 	if !IsValidEmail(email) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "邮箱格式不正确"})
 		return
